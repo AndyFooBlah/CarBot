@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Blue rounded background -->
+  <rect width="32" height="32" rx="8" fill="#2563eb"/>
+  <!-- Car body -->
+  <rect x="4" y="16" width="24" height="9" rx="2" fill="white"/>
+  <!-- Car roof -->
+  <path d="M9 16 L12 10 L20 10 L23 16 Z" fill="white"/>
+  <!-- Windshield -->
+  <path d="M12.5 15.5 L14 11 L18 11 L19.5 15.5 Z" fill="#2563eb"/>
+  <!-- Wheels -->
+  <circle cx="10" cy="25" r="3" fill="#1e40af"/>
+  <circle cx="22" cy="25" r="3" fill="#1e40af"/>
+  <circle cx="10" cy="25" r="1.2" fill="white"/>
+  <circle cx="22" cy="25" r="1.2" fill="white"/>
+</svg>
