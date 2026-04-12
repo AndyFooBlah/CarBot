@@ -40,6 +40,7 @@
       "collectionGroup": "memories",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
         { "fieldPath": "sessionId", "order": "ASCENDING" },
         { "fieldPath": "importance", "order": "DESCENDING" }
       ]

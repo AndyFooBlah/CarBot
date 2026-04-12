@@ -120,10 +120,13 @@ export function useCarbotSession(options: UseCarbotSessionOptions): UseCarbotSes
       now,
     });
 
+    console.log('[CarBot] System instruction built (%d chars):\n%s', instruction.length, instruction);
     setSystemInstruction(instruction);
 
-    // Start the VoiceCommon session — it will use the instruction we just set
-    await vcSession.startSession();
+    // Pass the instruction directly to avoid the stale-closure problem:
+    // setSystemInstruction schedules a re-render; vcSession.startSession()
+    // would otherwise run before that render and see the old (empty) value.
+    await vcSession.startSession(instruction);
   }, [userId, profile, vcSession]);
 
   return {

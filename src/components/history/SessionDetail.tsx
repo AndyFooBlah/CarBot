@@ -22,7 +22,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getSession } from '@andyfooblah/voicecommon';
+import { getSession, useAuth } from '@andyfooblah/voicecommon';
 import type { SessionMetadata, TranscriptEntry } from '@andyfooblah/voicecommon';
 import { getSessionMemories } from '../../services/memories';
 import {
@@ -249,16 +249,17 @@ function TranscriptView({
 
 export function SessionDetail() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
   const [session, setSession] = useState<CarbotSession | null>(null);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [tab, setTab] = useState<Tab>('raw');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || !user) return;
     Promise.all([
       getSession(id),
-      getSessionMemories(id),
+      getSessionMemories(id, user.uid),
     ])
       .then(([sess, mems]) => {
         setSession(sess as CarbotSession | null);

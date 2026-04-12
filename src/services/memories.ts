@@ -101,11 +101,16 @@ export async function getMemoryContextString(
 /**
  * Fetch memories associated with a specific session.
  * Used in the session detail view's "Memory Highlights" tab.
+ *
+ * @param sessionId - The session to fetch memories for.
+ * @param userId - The authenticated user's UID. Required by Firestore security
+ *   rules — the query must filter by userId so the rule can be evaluated.
  */
-export async function getSessionMemories(sessionId: string): Promise<Memory[]> {
+export async function getSessionMemories(sessionId: string, userId: string): Promise<Memory[]> {
   const snap = await getDocs(
     query(
       collection(db, 'memories'),
+      where('userId', '==', userId),
       where('sessionId', '==', sessionId),
       orderBy('importance', 'desc'),
     ),
