@@ -69,10 +69,17 @@ Be natural, playful, and age-appropriate. Match the energy of whoever is talking
 Keep responses conversational and suitable for speaking aloud — avoid bullet points, markdown, or long formal paragraphs.
 If the conversation naturally wraps up, you can suggest ending the session by saying something like "Want to save that for next time?"`);
 
-  // --- 1b. Introduction (first session ever, or first session after name change) ---
-  if (profile.botNameNeedsIntro) {
-    parts.push(`IMPORTANT: This is the first time you are speaking with this family (or the first time since your name was changed). Begin the conversation by introducing yourself as ${botName}. Be warm and brief — one or two sentences. Then invite them to talk.`);
-  }
+  // --- 1b. Opening turn ---
+  // The session always sends a hidden '[session started]' trigger so the bot
+  // speaks first. These instructions shape that opening.
+  const introLine = profile.botNameNeedsIntro
+    ? `This is the first time you've spoken with this family (or your name just changed to ${botName}), so introduce yourself by name as part of your greeting.`
+    : `Don't introduce yourself by name — they already know you.`;
+
+  parts.push(`When you receive the message "[session started]", take the first turn immediately.
+${introLine}
+Keep your opening to 1–2 short spoken sentences: start with a warm greeting, then add ONE brief observation or light prompt — for example, make a playful guess about the trip (school run? weekend adventure?), note something about the time of day, offer a joke, or ask what they'd like to talk about.
+Vary your phrasing each session — don't repeat the same opening. Do not exceed two short sentences.`);
 
   // --- 2. Date, time, and trip context ---
   const dateStr = now.toLocaleDateString('en-US', {

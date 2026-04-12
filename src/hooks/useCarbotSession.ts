@@ -66,6 +66,7 @@ export function useCarbotSession(options: UseCarbotSessionOptions): UseCarbotSes
     userId,
     systemInstruction,
     tools: allTools,
+    autoGreet: true,
     onToolCall: async (name: string, args: Record<string, unknown>) => {
       switch (name) {
         case 'getWeather':
