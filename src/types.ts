@@ -30,19 +30,33 @@ import { Timestamp } from 'firebase/firestore';
 export type DayOfWeek = 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun';
 
 /**
- * User-configured school schedule.
+ * A single scheduled activity for a given day.
+ * e.g. { name: "Drop-off", startTime: "07:15", endTime: "08:15" }
+ */
+export interface ScheduleEntry {
+  name: string;
+  /** Start time in 'HH:MM' (24-hour, local time). */
+  startTime: string;
+  /** End time in 'HH:MM' (24-hour, local time). */
+  endTime: string;
+}
+
+/**
+ * User-configured weekly schedule.
  * Stored in `users/{uid}.routine`.
+ *
+ * Each day that has at least one entry is treated as a "structured day".
+ * Days with no entries are treated as unscheduled.
  */
 export interface Routine {
-  /** Which days are school days. */
-  schoolDays: DayOfWeek[];
-  /** Morning departure time in 'HH:MM' (24-hour, local time). */
-  morningDepartureTime: string;
-  /** Afternoon pickup time in 'HH:MM' (24-hour, local time). */
-  afternoonPickupTime: string;
   /**
-   * How many minutes on either side of a drive time still counts as a commute.
-   * Default: 30.
+   * Per-day activity list. Only days with activities need to be present.
+   * e.g. Mon–Fri might have Drop-off + Pickup; Sat might have Ice Hockey + Violin.
+   */
+  schedule: Partial<Record<DayOfWeek, ScheduleEntry[]>>;
+  /**
+   * How many minutes before an activity's start time (or after its end time)
+   * still counts as "in transit". Default: 30.
    */
   contextWindowMinutes: number;
 }

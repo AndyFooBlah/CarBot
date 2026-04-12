@@ -30,9 +30,16 @@ import {
   saveChildName,
   saveEmailSummariesEnabled,
 } from '../../services/userProfile';
-import type { DayOfWeek, Routine, LocationConfig } from '../../types';
+import type { DayOfWeek, Routine, ScheduleEntry, LocationConfig } from '../../types';
 
 const ALL_DAYS: DayOfWeek[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+const DAY_LABELS: Record<DayOfWeek, string> = {
+  Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday',
+  Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday',
+};
+
+const EMPTY_ENTRY: ScheduleEntry = { name: '', startTime: '', endTime: '' };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -53,6 +60,88 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
+function TimeInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <input
+      type="time"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="px-2 py-1.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-28"
+    />
+  );
+}
+
+function DayScheduleEditor({
+  label,
+  entries,
+  onAdd,
+  onUpdate,
+  onRemove,
+}: {
+  day: DayOfWeek;
+  label: string;
+  entries: ScheduleEntry[];
+  onAdd: () => void;
+  onUpdate: (idx: number, entry: ScheduleEntry) => void;
+  onRemove: (idx: number) => void;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-sm font-medium text-slate-700">{label}</span>
+        <button
+          onClick={onAdd}
+          className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+        >
+          + Add
+        </button>
+      </div>
+      {entries.length === 0 ? (
+        <p className="text-xs text-slate-400 ml-0.5">No activities</p>
+      ) : (
+        <div className="space-y-1.5">
+          {entries.map((entry, idx) => (
+            <div key={idx} className="flex items-center gap-2">
+              <input
+                type="text"
+                value={entry.name}
+                onChange={(e) => onUpdate(idx, { ...entry, name: e.target.value })}
+                placeholder="Activity"
+                className="flex-1 px-2 py-1.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0"
+              />
+              <TimeInput
+                value={entry.startTime}
+                onChange={(v) => onUpdate(idx, { ...entry, startTime: v })}
+              />
+              <span className="text-slate-400 text-sm shrink-0">–</span>
+              <TimeInput
+                value={entry.endTime}
+                onChange={(v) => onUpdate(idx, { ...entry, endTime: v })}
+              />
+              <button
+                onClick={() => onRemove(idx)}
+                className="text-slate-400 hover:text-red-500 text-lg leading-none shrink-0 px-1"
+                aria-label="Remove"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const { user } = useAuth();
   const { profile, loading, refetch } = useUserProfile(user?.uid ?? null);
@@ -64,9 +153,7 @@ export function SettingsPage() {
   const [emailSummaries, setEmailSummaries] = useState(true);
 
   // Routine fields
-  const [schoolDays, setSchoolDays] = useState<DayOfWeek[]>(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
-  const [morningTime, setMorningTime] = useState('08:15');
-  const [afternoonTime, setAfternoonTime] = useState('15:30');
+  const [schedule, setSchedule] = useState<Partial<Record<DayOfWeek, ScheduleEntry[]>>>({});
   const [windowMinutes, setWindowMinutes] = useState(30);
 
   // Location fields
@@ -80,10 +167,8 @@ export function SettingsPage() {
     setChildName(profile.childName ?? '');
     setEmailSummaries(profile.emailSummariesEnabled ?? true);
     if (profile.routine) {
-      setSchoolDays(profile.routine.schoolDays);
-      setMorningTime(profile.routine.morningDepartureTime);
-      setAfternoonTime(profile.routine.afternoonPickupTime);
-      setWindowMinutes(profile.routine.contextWindowMinutes);
+      setSchedule(profile.routine.schedule ?? {});
+      setWindowMinutes(profile.routine.contextWindowMinutes ?? 30);
     }
     if (profile.locations) {
       setHomeCity(profile.locations.homeCity);
@@ -112,18 +197,41 @@ export function SettingsPage() {
   const handleSaveRoutine = async () => {
     if (!user) return;
     try {
-      const routine: Routine = {
-        schoolDays,
-        morningDepartureTime: morningTime,
-        afternoonPickupTime: afternoonTime,
-        contextWindowMinutes: windowMinutes,
-      };
+      const routine: Routine = { schedule, contextWindowMinutes: windowMinutes };
       await saveRoutine(user.uid, routine);
-      flash('Routine saved');
+      flash('Schedule saved');
       refetch();
     } catch (err) {
       setError(String(err));
     }
+  };
+
+  const addEntry = (day: DayOfWeek) => {
+    setSchedule((prev) => ({
+      ...prev,
+      [day]: [...(prev[day] ?? []), { ...EMPTY_ENTRY }],
+    }));
+  };
+
+  const updateEntry = (day: DayOfWeek, idx: number, entry: ScheduleEntry) => {
+    setSchedule((prev) => {
+      const entries = [...(prev[day] ?? [])];
+      entries[idx] = entry;
+      return { ...prev, [day]: entries };
+    });
+  };
+
+  const removeEntry = (day: DayOfWeek, idx: number) => {
+    setSchedule((prev) => {
+      const entries = (prev[day] ?? []).filter((_, i) => i !== idx);
+      const next = { ...prev };
+      if (entries.length === 0) {
+        delete next[day];
+      } else {
+        next[day] = entries;
+      }
+      return next;
+    });
   };
 
   const handleSaveLocation = async () => {
@@ -140,12 +248,6 @@ export function SettingsPage() {
     } catch (err) {
       setError(String(err));
     }
-  };
-
-  const toggleDay = (day: DayOfWeek) => {
-    setSchoolDays((prev) =>
-      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day],
-    );
   };
 
   if (loading) {
@@ -198,62 +300,74 @@ export function SettingsPage() {
         </button>
       </Section>
 
-      {/* Routine */}
-      <Section title="School Routine">
-        <Field label="School days">
-          <div className="flex gap-1.5 flex-wrap">
-            {ALL_DAYS.map((day) => (
-              <button
-                key={day}
-                onClick={() => toggleDay(day)}
-                className={`text-sm px-3 py-1 rounded-lg font-medium transition-colors ${
-                  schoolDays.includes(day)
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                {day}
-              </button>
-            ))}
+      {/* Schedule */}
+      <Section title="Weekly Schedule">
+        <p className="text-sm text-slate-500 -mt-1">
+          List activities for each day with start and end times. CarBot uses this to understand
+          what you're most likely doing when a session starts.
+        </p>
+
+        <div className="space-y-5">
+          {/* Weekdays */}
+          <div>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Weekdays</p>
+            <div className="space-y-4">
+              {(['Mon', 'Tue', 'Wed', 'Thu', 'Fri'] as DayOfWeek[]).map((day) => (
+                <DayScheduleEditor
+                  key={day}
+                  day={day}
+                  label={DAY_LABELS[day]}
+                  entries={schedule[day] ?? []}
+                  onAdd={() => addEntry(day)}
+                  onUpdate={(idx, entry) => updateEntry(day, idx, entry)}
+                  onRemove={(idx) => removeEntry(day, idx)}
+                />
+              ))}
+            </div>
           </div>
-        </Field>
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Morning departure" hint="When you leave for school">
-            <input
-              type="time"
-              value={morningTime}
-              onChange={(e) => setMorningTime(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </Field>
-          <Field label="Afternoon pickup" hint="When you pick up from school">
-            <input
-              type="time"
-              value={afternoonTime}
-              onChange={(e) => setAfternoonTime(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </Field>
+
+          {/* Weekend */}
+          <div>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Weekend</p>
+            <div className="space-y-4">
+              {(['Sat', 'Sun'] as DayOfWeek[]).map((day) => (
+                <DayScheduleEditor
+                  key={day}
+                  day={day}
+                  label={DAY_LABELS[day]}
+                  entries={schedule[day] ?? []}
+                  onAdd={() => addEntry(day)}
+                  onUpdate={(idx, entry) => updateEntry(day, idx, entry)}
+                  onRemove={(idx) => removeEntry(day, idx)}
+                />
+              ))}
+            </div>
+          </div>
         </div>
-        <Field label={`Context window: ±${windowMinutes} minutes`} hint="How far from drive time still counts as a commute">
-          <input
-            type="range"
-            min={5}
-            max={60}
-            step={5}
-            value={windowMinutes}
-            onChange={(e) => setWindowMinutes(Number(e.target.value))}
-            className="w-full"
-          />
-          <div className="flex justify-between text-xs text-slate-400 mt-1">
-            <span>5 min</span><span>60 min</span>
+
+        <Field
+          label="Context window"
+          hint="Sessions started this many minutes before an activity's start time (or after its end time) are treated as in transit"
+        >
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={windowMinutes}
+              onChange={(e) => setWindowMinutes(Math.max(5, Math.min(120, Number(e.target.value))))}
+              min={5}
+              max={120}
+              step={5}
+              className="w-16 px-2 py-1.5 border border-slate-300 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <span className="text-sm text-slate-500">minutes</span>
           </div>
         </Field>
+
         <button
           onClick={handleSaveRoutine}
           className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors"
         >
-          Save Routine
+          Save Schedule
         </button>
       </Section>
 

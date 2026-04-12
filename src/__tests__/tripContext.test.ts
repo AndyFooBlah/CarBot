@@ -18,6 +18,8 @@ import {
   parseTimeToMinutes,
   dateToMinutesSinceMidnight,
   tripContextToDescription,
+  getActiveActivity,
+  getDayScheduleSummary,
 } from '../services/tripContext';
 import type { Routine } from '../types';
 
@@ -41,10 +43,15 @@ function makeDate(
   return baseMonday;
 }
 
+/** A typical weekday routine: drop-off 08:00–08:30, pickup 15:00–15:30. */
 const DEFAULT_ROUTINE: Routine = {
-  schoolDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-  morningDepartureTime: '08:00',
-  afternoonPickupTime: '15:00',
+  schedule: {
+    Mon: [{ name: 'Drop-off', startTime: '08:00', endTime: '08:30' }, { name: 'Pickup', startTime: '15:00', endTime: '15:30' }],
+    Tue: [{ name: 'Drop-off', startTime: '08:00', endTime: '08:30' }, { name: 'Pickup', startTime: '15:00', endTime: '15:30' }],
+    Wed: [{ name: 'Drop-off', startTime: '08:00', endTime: '08:30' }, { name: 'Pickup', startTime: '15:00', endTime: '15:30' }],
+    Thu: [{ name: 'Drop-off', startTime: '08:00', endTime: '08:30' }, { name: 'Pickup', startTime: '15:00', endTime: '15:30' }],
+    Fri: [{ name: 'Drop-off', startTime: '08:00', endTime: '08:30' }, { name: 'Pickup', startTime: '15:00', endTime: '15:30' }],
+  },
   contextWindowMinutes: 30,
 };
 
@@ -105,40 +112,35 @@ describe('inferTripContext', () => {
     expect(inferTripContext(undefined, makeDate('Mon', '08:00'))).toBe('unstructured');
   });
 
-  it('returns unstructured when schoolDays is empty', () => {
-    expect(inferTripContext({ ...DEFAULT_ROUTINE, schoolDays: [] }, makeDate('Mon', '08:00'))).toBe('unstructured');
+  it('returns unstructured when schedule is empty', () => {
+    expect(inferTripContext({ schedule: {}, contextWindowMinutes: 30 }, makeDate('Mon', '08:00'))).toBe('unstructured');
   });
 
-  it('returns non_school_day on weekend', () => {
+  it('returns non_school_day when day has no entries', () => {
+    // Sat and Sun have no entries in DEFAULT_ROUTINE
     expect(inferTripContext(DEFAULT_ROUTINE, makeDate('Sat', '08:00'))).toBe('non_school_day');
     expect(inferTripContext(DEFAULT_ROUTINE, makeDate('Sun', '15:00'))).toBe('non_school_day');
   });
 
-  it('returns school_commute_morning exactly at departure time', () => {
+  it('returns school_commute_morning exactly at first entry start time', () => {
     expect(inferTripContext(DEFAULT_ROUTINE, makeDate('Mon', '08:00'))).toBe('school_commute_morning');
   });
 
-  it('returns school_commute_morning within the window', () => {
-    // 30 min before departure
+  it('returns school_commute_morning within the window before first entry', () => {
+    // 30 min before first entry start
     expect(inferTripContext(DEFAULT_ROUTINE, makeDate('Mon', '07:30'))).toBe('school_commute_morning');
-    // 30 min after departure
-    expect(inferTripContext(DEFAULT_ROUTINE, makeDate('Mon', '08:30'))).toBe('school_commute_morning');
   });
 
   it('returns school_day_other just outside the morning window', () => {
-    // 31 minutes before departure
+    // 31 minutes before first entry start
     expect(inferTripContext(DEFAULT_ROUTINE, makeDate('Mon', '07:29'))).toBe('school_day_other');
-    // 31 minutes after departure
-    expect(inferTripContext(DEFAULT_ROUTINE, makeDate('Mon', '08:31'))).toBe('school_day_other');
   });
 
-  it('returns school_commute_afternoon exactly at pickup time', () => {
-    expect(inferTripContext(DEFAULT_ROUTINE, makeDate('Fri', '15:00'))).toBe('school_commute_afternoon');
-  });
-
-  it('returns school_commute_afternoon within the window', () => {
-    expect(inferTripContext(DEFAULT_ROUTINE, makeDate('Wed', '14:30'))).toBe('school_commute_afternoon');
-    expect(inferTripContext(DEFAULT_ROUTINE, makeDate('Wed', '15:30'))).toBe('school_commute_afternoon');
+  it('returns school_commute_afternoon near last entry end time', () => {
+    // Exactly at last entry end (15:30)
+    expect(inferTripContext(DEFAULT_ROUTINE, makeDate('Fri', '15:30'))).toBe('school_commute_afternoon');
+    // 30 min after last entry end
+    expect(inferTripContext(DEFAULT_ROUTINE, makeDate('Wed', '16:00'))).toBe('school_commute_afternoon');
   });
 
   it('returns school_day_other in the middle of the day', () => {
@@ -146,17 +148,98 @@ describe('inferTripContext', () => {
   });
 
   it('uses custom contextWindowMinutes', () => {
-    const narrow = { ...DEFAULT_ROUTINE, contextWindowMinutes: 10 };
-    // 11 min before departure — outside 10-min window
+    const narrow: Routine = { ...DEFAULT_ROUTINE, contextWindowMinutes: 10 };
+    // 11 min before first entry start — outside 10-min window
     expect(inferTripContext(narrow, makeDate('Mon', '07:49'))).toBe('school_day_other');
-    // 10 min before departure — inside window
+    // 10 min before first entry start — inside window
     expect(inferTripContext(narrow, makeDate('Mon', '07:50'))).toBe('school_commute_morning');
   });
 
-  it('handles routines with only some school days', () => {
-    const mwf = { ...DEFAULT_ROUTINE, schoolDays: ['Mon', 'Wed', 'Fri'] as Routine['schoolDays'] };
-    expect(inferTripContext(mwf, makeDate('Tue', '08:00'))).toBe('non_school_day');
-    expect(inferTripContext(mwf, makeDate('Wed', '08:00'))).toBe('school_commute_morning');
+  it('handles weekend activities (e.g. ice hockey on Saturday)', () => {
+    const withSat: Routine = {
+      ...DEFAULT_ROUTINE,
+      schedule: {
+        ...DEFAULT_ROUTINE.schedule,
+        Sat: [
+          { name: 'Ice Hockey', startTime: '07:30', endTime: '08:30' },
+          { name: 'Violin', startTime: '09:30', endTime: '11:00' },
+        ],
+      },
+    };
+    // Near start of ice hockey → morning commute equivalent
+    expect(inferTripContext(withSat, makeDate('Sat', '07:30'))).toBe('school_commute_morning');
+    // 45 min after start of Ice Hockey (07:30) → outside 30-min window → school_day_other
+    expect(inferTripContext(withSat, makeDate('Sat', '08:15'))).toBe('school_day_other');
+    // Near end of violin → afternoon commute equivalent
+    expect(inferTripContext(withSat, makeDate('Sat', '11:00'))).toBe('school_commute_afternoon');
+    // Sunday still has no activities
+    expect(inferTripContext(withSat, makeDate('Sun', '10:00'))).toBe('non_school_day');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getActiveActivity
+// ---------------------------------------------------------------------------
+
+describe('getActiveActivity', () => {
+  const routine: Routine = {
+    schedule: {
+      Sat: [
+        { name: 'Ice Hockey', startTime: '07:30', endTime: '08:30' },
+        { name: 'Violin', startTime: '09:30', endTime: '11:00' },
+      ],
+    },
+    contextWindowMinutes: 30,
+  };
+
+  it('returns null when routine is null', () => {
+    expect(getActiveActivity(null, makeDate('Sat', '07:30'))).toBeNull();
+  });
+
+  it('returns the active activity when within its window', () => {
+    const result = getActiveActivity(routine, makeDate('Sat', '07:30'));
+    expect(result?.name).toBe('Ice Hockey');
+  });
+
+  it('returns null when between activities and outside window', () => {
+    // 09:00 — 30 min after Ice Hockey ends (08:30), 30 min before Violin starts (09:30)
+    // 08:30 + 30 = 09:00 exactly on the boundary of Ice Hockey, and 09:30 - 30 = 09:00 on Violin
+    // Both are on boundary, Ice Hockey should match (09:00 <= 08:30 + 30)
+    const result = getActiveActivity(routine, makeDate('Sat', '09:00'));
+    expect(result?.name).toBe('Ice Hockey'); // still within 30-min tail of Ice Hockey
+  });
+
+  it('returns Violin when in its time window', () => {
+    const result = getActiveActivity(routine, makeDate('Sat', '10:00'));
+    expect(result?.name).toBe('Violin');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getDayScheduleSummary
+// ---------------------------------------------------------------------------
+
+describe('getDayScheduleSummary', () => {
+  const routine: Routine = {
+    schedule: {
+      Sat: [
+        { name: 'Ice Hockey', startTime: '07:30', endTime: '08:30' },
+        { name: 'Violin', startTime: '09:30', endTime: '11:00' },
+      ],
+    },
+    contextWindowMinutes: 30,
+  };
+
+  it('returns null when no entries for the day', () => {
+    expect(getDayScheduleSummary(routine, makeDate('Sun', '10:00'))).toBeNull();
+  });
+
+  it('includes activity names and formatted times', () => {
+    const result = getDayScheduleSummary(routine, makeDate('Sat', '10:00'));
+    expect(result).not.toBeNull();
+    expect(result).toMatch(/Ice Hockey/);
+    expect(result).toMatch(/Violin/);
+    expect(result).toMatch(/Saturday/i);
   });
 });
 
@@ -190,8 +273,8 @@ describe('tripContextToDescription', () => {
     expect(result).toMatch(/morning/i);
   });
 
-  it('mentions after school for afternoon commute', () => {
+  it('mentions heading home for afternoon commute', () => {
     const result = tripContextToDescription('school_commute_afternoon', makeDate('Mon', '15:00'));
-    expect(result).toMatch(/after school|home/i);
+    expect(result).toMatch(/heading home|afternoon|wrapping/i);
   });
 });

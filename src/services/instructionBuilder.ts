@@ -29,7 +29,7 @@
 
 import { getMemoryContextString } from './memories';
 import { getActiveContextDocuments, buildContextDocumentSection } from './contextDocuments';
-import { inferTripContext, tripContextToDescription } from './tripContext';
+import { inferTripContext, tripContextToDescription, getDayScheduleSummary } from './tripContext';
 import type { CarbotUserProfile, TripContext } from '../types';
 
 export interface SessionContext {
@@ -77,9 +77,15 @@ If the conversation naturally wraps up, you can suggest ending the session by sa
   const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   parts.push(`Current date and time: ${dateStr}, ${timeStr}.`);
 
-  const tripDesc = tripContextToDescription(tripContext, now);
+  const tripDesc = tripContextToDescription(tripContext, now, profile.routine);
   if (tripDesc) {
     parts.push(tripDesc);
+  }
+
+  // Include today's full schedule so the bot knows what's coming up
+  const daySchedule = getDayScheduleSummary(profile.routine, now);
+  if (daySchedule) {
+    parts.push(daySchedule);
   }
 
   // --- 3. Location ---

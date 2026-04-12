@@ -24,9 +24,9 @@
  * user's local time and the browser's Date object reflects local time.
  */
 
-import type { Routine, TripContext, DayOfWeek } from '../types';
+import type { Routine, ScheduleEntry, TripContext, DayOfWeek } from '../types';
 
-/** Short name for each day, matching the Routine.schoolDays format. */
+/** Short name for each day, matching DayOfWeek values (indexed by Date.getDay()). */
 const DAY_NAMES: DayOfWeek[] = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /**
@@ -50,47 +50,109 @@ export function dateToMinutesSinceMidnight(date: Date): number {
 }
 
 /**
+ * Return the schedule entries for a given day, sorted by start time.
+ */
+function getDayEntries(routine: Routine, dayName: DayOfWeek): ScheduleEntry[] {
+  return [...(routine.schedule?.[dayName] ?? [])].sort(
+    (a, b) => parseTimeToMinutes(a.startTime) - parseTimeToMinutes(b.startTime),
+  );
+}
+
+/**
  * Infer the trip context from the current date/time and the user's routine.
  *
- * @param routine - User's school schedule config. If undefined/null, returns 'unstructured'.
+ * A "structured day" is any day that has at least one schedule entry.
+ * - Morning commute: within contextWindow of the first entry's start time.
+ * - Afternoon commute: within contextWindow of the last entry's end time.
+ * - School day other: structured day but not near any activity boundary.
+ * - Non-school day: no entries for today but routine is configured.
+ * - Unstructured: no routine or empty schedule.
+ *
+ * @param routine - User's schedule config. If undefined/null, returns 'unstructured'.
  * @param now - The current date/time (defaults to new Date()).
- * @returns The inferred TripContext.
  */
 export function inferTripContext(
   routine: Routine | null | undefined,
   now: Date = new Date(),
 ): TripContext {
-  if (!routine || !routine.schoolDays?.length) {
-    return 'unstructured';
-  }
+  if (!routine) return 'unstructured';
+
+  const hasAnyEntries = Object.values(routine.schedule ?? {}).some((e) => e && e.length > 0);
+  if (!hasAnyEntries) return 'unstructured';
 
   const dayName = DAY_NAMES[now.getDay()];
-  const isSchoolDay = routine.schoolDays.includes(dayName);
+  const dayEntries = getDayEntries(routine, dayName);
 
-  if (!isSchoolDay) {
+  if (dayEntries.length === 0) {
     return 'non_school_day';
   }
 
   const windowMinutes = routine.contextWindowMinutes ?? 30;
   const currentMinutes = dateToMinutesSinceMidnight(now);
 
-  const morningMinutes = parseTimeToMinutes(routine.morningDepartureTime);
-  if (!isNaN(morningMinutes)) {
-    const diff = Math.abs(currentMinutes - morningMinutes);
-    if (diff <= windowMinutes) {
-      return 'school_commute_morning';
-    }
+  // Near the start of the first activity → morning commute equivalent
+  const firstStart = parseTimeToMinutes(dayEntries[0].startTime);
+  if (!isNaN(firstStart) && Math.abs(currentMinutes - firstStart) <= windowMinutes) {
+    return 'school_commute_morning';
   }
 
-  const afternoonMinutes = parseTimeToMinutes(routine.afternoonPickupTime);
-  if (!isNaN(afternoonMinutes)) {
-    const diff = Math.abs(currentMinutes - afternoonMinutes);
-    if (diff <= windowMinutes) {
-      return 'school_commute_afternoon';
-    }
+  // Near the end of the last activity → afternoon commute equivalent
+  const lastEnd = parseTimeToMinutes(dayEntries[dayEntries.length - 1].endTime);
+  if (!isNaN(lastEnd) && Math.abs(currentMinutes - lastEnd) <= windowMinutes) {
+    return 'school_commute_afternoon';
   }
 
   return 'school_day_other';
+}
+
+/**
+ * Return the schedule entry whose time window (startTime – endTime, extended by
+ * contextWindow on each side) contains the current time, or null if none matches.
+ */
+export function getActiveActivity(
+  routine: Routine | null | undefined,
+  now: Date = new Date(),
+): ScheduleEntry | null {
+  if (!routine) return null;
+  const dayName = DAY_NAMES[now.getDay()];
+  const dayEntries = getDayEntries(routine, dayName);
+  const windowMinutes = routine.contextWindowMinutes ?? 30;
+  const currentMinutes = dateToMinutesSinceMidnight(now);
+
+  for (const entry of dayEntries) {
+    const start = parseTimeToMinutes(entry.startTime);
+    const end = parseTimeToMinutes(entry.endTime);
+    if (isNaN(start) || isNaN(end)) continue;
+    if (currentMinutes >= start - windowMinutes && currentMinutes <= end + windowMinutes) {
+      return entry;
+    }
+  }
+  return null;
+}
+
+/**
+ * Return a human-readable summary of today's full schedule for the system prompt.
+ * e.g. "Saturday schedule: Ice Hockey 7:30–8:30, Violin 9:30–11:00"
+ */
+export function getDayScheduleSummary(
+  routine: Routine | null | undefined,
+  now: Date = new Date(),
+): string | null {
+  if (!routine) return null;
+  const dayName = DAY_NAMES[now.getDay()];
+  const dayEntries = getDayEntries(routine, dayName);
+  if (dayEntries.length === 0) return null;
+
+  const fmt = (t: string) => {
+    const [h, m] = t.split(':').map(Number);
+    const period = h < 12 ? 'am' : 'pm';
+    const hour = h % 12 || 12;
+    return m === 0 ? `${hour}${period}` : `${hour}:${m.toString().padStart(2, '0')}${period}`;
+  };
+
+  const label = now.toLocaleDateString('en-US', { weekday: 'long' });
+  const items = dayEntries.map((e) => `${e.name} ${fmt(e.startTime)}–${fmt(e.endTime)}`).join(', ');
+  return `${label} schedule: ${items}.`;
 }
 
 /**
@@ -99,24 +161,30 @@ export function inferTripContext(
  *
  * @param context - The inferred trip context.
  * @param now - The current date/time (defaults to new Date()).
- * @returns A human-readable description, or null if context is 'unstructured'.
+ * @param routine - Optional routine, used to name the specific activity.
  */
 export function tripContextToDescription(
   context: TripContext,
   now: Date = new Date(),
+  routine?: Routine | null,
 ): string | null {
   const dayName = now.toLocaleDateString('en-US', { weekday: 'long' });
   const timeOfDay = now.getHours() < 12 ? 'morning' : now.getHours() < 17 ? 'afternoon' : 'evening';
+  const activity = routine ? getActiveActivity(routine, now) : null;
 
   switch (context) {
     case 'school_commute_morning':
-      return `It's ${dayName} morning and the family is heading to school.`;
+      return activity
+        ? `It's ${dayName} morning and the family is heading to ${activity.name}.`
+        : `It's ${dayName} morning and the family is heading out.`;
     case 'school_commute_afternoon':
-      return `It's ${dayName} afternoon and the family is heading home after school.`;
+      return activity
+        ? `It's ${dayName} ${timeOfDay} — ${activity.name} is wrapping up and the family is heading home.`
+        : `It's ${dayName} ${timeOfDay} and the family is heading home.`;
     case 'school_day_other':
-      return `It's a school day (${dayName} ${timeOfDay}).`;
+      return `It's ${dayName} ${timeOfDay}.`;
     case 'non_school_day':
-      return `It's ${dayName} — not a school day.`;
+      return `It's ${dayName} — no activities scheduled.`;
     case 'unstructured':
       return null;
   }
