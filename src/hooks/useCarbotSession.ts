@@ -36,6 +36,7 @@ import { searchWikipedia } from '@andyfooblah/voicecommon';
 import { getActiveContextDocuments } from '../services/contextDocuments';
 import { buildCarbotInstruction, getCurrentCity, computeTripContext } from '../services/instructionBuilder';
 import { setSessionCarbotFields } from '../services/sessions';
+import { markBotNameIntroduced } from '../services/userProfile';
 import type { CarbotUserProfile, TripContext } from '../types';
 
 export interface UseCarbotSessionOptions {
@@ -127,6 +128,14 @@ export function useCarbotSession(options: UseCarbotSessionOptions): UseCarbotSes
     // setSystemInstruction schedules a re-render; vcSession.startSession()
     // would otherwise run before that render and see the old (empty) value.
     await vcSession.startSession(instruction);
+
+    // Session connected — if the bot introduced itself with its name, clear
+    // the flag so it doesn't repeat the introduction next session.
+    if (profile.botNameNeedsIntro) {
+      markBotNameIntroduced(userId).catch((err) =>
+        console.error('[useCarbotSession] Failed to clear botNameNeedsIntro:', err),
+      );
+    }
   }, [userId, profile, vcSession]);
 
   return {

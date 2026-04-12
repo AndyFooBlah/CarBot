@@ -29,6 +29,7 @@ import {
   saveRoutine,
   saveLocations,
   saveChildName,
+  saveBotName,
   saveEmailSummariesEnabled,
 } from '../../services/userProfile';
 import type { DayOfWeek, Routine, ScheduleEntry, NamedLocation } from '../../types';
@@ -394,6 +395,7 @@ export function SettingsPage() {
 
   // Profile fields
   const [childName, setChildName] = useState('');
+  const [botName, setBotName] = useState('');
   const [emailSummaries, setEmailSummaries] = useState(true);
 
   // Routine fields
@@ -409,6 +411,7 @@ export function SettingsPage() {
   useEffect(() => {
     if (!profile) return;
     setChildName(profile.childName ?? '');
+    setBotName(profile.botName ?? '');
     setEmailSummaries(profile.emailSummariesEnabled ?? true);
     if (profile.routine) {
       setSchedule(profile.routine.schedule ?? {});
@@ -428,6 +431,7 @@ export function SettingsPage() {
     if (!user) return;
     try {
       await saveChildName(user.uid, childName);
+      await saveBotName(user.uid, botName.trim() || 'CarBot');
       await saveEmailSummariesEnabled(user.uid, emailSummaries);
       flash('Profile saved');
       refetch();
@@ -520,6 +524,15 @@ export function SettingsPage() {
 
       {/* Profile */}
       <Section title="Profile">
+        <Field label="Bot name" hint="The name CarBot introduces itself with. Changing this triggers a fresh introduction on the next session.">
+          <input
+            type="text"
+            value={botName}
+            onChange={(e) => setBotName(e.target.value)}
+            placeholder="CarBot"
+            className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </Field>
         <Field label="Child's name" hint="Used in transcript speaker labels and system instruction">
           <input
             type="text"

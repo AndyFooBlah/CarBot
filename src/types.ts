@@ -108,6 +108,14 @@ export interface CarbotUserProfile {
   locations?: NamedLocation[];
   /** Child's name, used in transcript speaker labels. */
   childName?: string;
+  /** The name the bot introduces itself with, e.g. "Zoomer". Default: "CarBot". */
+  botName?: string;
+  /**
+   * When true, the bot will introduce itself by name at the start of the next
+   * session. Set to true whenever botName is saved; cleared after first
+   * successful session with that name.
+   */
+  botNameNeedsIntro?: boolean;
   /** Whether to receive session summary emails. Default: true. */
   emailSummariesEnabled?: boolean;
 }

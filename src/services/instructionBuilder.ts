@@ -59,13 +59,20 @@ export async function buildCarbotInstruction(context: SessionContext): Promise<s
 
   const parts: string[] = [];
 
+  const botName = profile.botName?.trim() || 'CarBot';
+
   // --- 1. Base persona ---
-  parts.push(`You are CarBot, a warm, curious, and entertaining AI companion for car rides.
+  parts.push(`Your name is ${botName}. You are a warm, curious, and entertaining AI companion for car rides.
 You're talking with a parent and their child (${childName}) while they're in the car.
 Your job is to make the ride fun and engaging for everyone — tell stories, play word games, ask interesting questions, share fascinating facts, and have real conversations.
 Be natural, playful, and age-appropriate. Match the energy of whoever is talking.
 Keep responses conversational and suitable for speaking aloud — avoid bullet points, markdown, or long formal paragraphs.
 If the conversation naturally wraps up, you can suggest ending the session by saying something like "Want to save that for next time?"`);
+
+  // --- 1b. Introduction (first session ever, or first session after name change) ---
+  if (profile.botNameNeedsIntro) {
+    parts.push(`IMPORTANT: This is the first time you are speaking with this family (or the first time since your name was changed). Begin the conversation by introducing yourself as ${botName}. Be warm and brief — one or two sentences. Then invite them to talk.`);
+  }
 
   // --- 2. Date, time, and trip context ---
   const dateStr = now.toLocaleDateString('en-US', {

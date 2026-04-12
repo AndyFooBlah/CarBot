@@ -71,6 +71,19 @@ export async function saveChildName(uid: string, childName: string): Promise<voi
   await updateDoc(doc(db, 'users', uid), { childName });
 }
 
+/**
+ * Save the bot's name. Always sets botNameNeedsIntro=true so the bot
+ * introduces itself with the new name at the start of the next session.
+ */
+export async function saveBotName(uid: string, botName: string): Promise<void> {
+  await updateDoc(doc(db, 'users', uid), { botName, botNameNeedsIntro: true });
+}
+
+/** Called after a session successfully starts with the new name. */
+export async function markBotNameIntroduced(uid: string): Promise<void> {
+  await updateDoc(doc(db, 'users', uid), { botNameNeedsIntro: false });
+}
+
 /** Update the email summaries enabled setting. */
 export async function saveEmailSummariesEnabled(
   uid: string,
