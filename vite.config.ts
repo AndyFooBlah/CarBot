@@ -27,6 +27,8 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+    // Prevent duplicate React instances when VoiceCommon is a local package
+    dedupe: ['react', 'react-dom'],
   },
   // pdfjs-dist ships a worker as a separate file; tell Vite not to inline it
   optimizeDeps: {
