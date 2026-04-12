@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@andyfooblah/voicecommon": "file:../voicecommon",
+    "@google/genai": "^1.41.0",
     "firebase": "^12.9.0",
     "pdfjs-dist": "^4.10.38",
     "react": "^19.2.3",

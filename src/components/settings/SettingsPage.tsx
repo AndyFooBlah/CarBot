@@ -17,12 +17,14 @@
  *
  * Three sections:
  *   1. Profile — child's name, email summaries
- *   2. Routine — school days, drive times, context window
+ *   2. Routine — freeform activity input parsed by Gemini Flash
  *   3. Location — home city, school name
  */
 
 import React, { useState, useEffect } from 'react';
+import { GoogleGenAI } from '@google/genai';
 import { useAuth } from '@andyfooblah/voicecommon';
+import { getConfig } from '@andyfooblah/voicecommon';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import {
   saveRoutine,
@@ -32,14 +34,150 @@ import {
 } from '../../services/userProfile';
 import type { DayOfWeek, Routine, ScheduleEntry, LocationConfig } from '../../types';
 
-const ALL_DAYS: DayOfWeek[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
 const DAY_LABELS: Record<DayOfWeek, string> = {
   Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday',
   Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday',
 };
 
-const EMPTY_ENTRY: ScheduleEntry = { name: '', startTime: '', endTime: '' };
+// ---------------------------------------------------------------------------
+// Gemini schedule parser
+// ---------------------------------------------------------------------------
+
+interface ParsedOccurrence {
+  day: DayOfWeek;
+  startTime: string;
+  endTime: string;
+}
+
+/**
+ * Use Gemini Flash to parse a natural-language schedule description into
+ * structured day/time occurrences.
+ *
+ * Example input: "Go to school from 7:15 to 8:15 every weekday morning"
+ * Example output: [
+ *   { day: "Mon", startTime: "07:15", endTime: "08:15" },
+ *   { day: "Tue", startTime: "07:15", endTime: "08:15" },
+ *   ...
+ * ]
+ */
+async function parseScheduleWithGemini(
+  activityName: string,
+  description: string,
+  apiKey: string,
+): Promise<ParsedOccurrence[]> {
+  const ai = new GoogleGenAI({ apiKey });
+  const prompt = `You are a schedule parser. Parse the following schedule description into structured JSON.
+
+Activity name: "${activityName}"
+Schedule description: "${description}"
+
+Return ONLY a JSON array (no markdown, no explanation) where each element has:
+- "day": one of "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"
+- "startTime": 24-hour time string "HH:MM"
+- "endTime": 24-hour time string "HH:MM"
+
+Examples:
+- "every weekday from 7:15 to 8:15" → [{"day":"Mon","startTime":"07:15","endTime":"08:15"},{"day":"Tue","startTime":"07:15","endTime":"08:15"},{"day":"Wed","startTime":"07:15","endTime":"08:15"},{"day":"Thu","startTime":"07:15","endTime":"08:15"},{"day":"Fri","startTime":"07:15","endTime":"08:15"}]
+- "Saturdays 9:30am to 11am" → [{"day":"Sat","startTime":"09:30","endTime":"11:00"}]
+- "Monday and Wednesday afternoons 3pm-4:30pm" → [{"day":"Mon","startTime":"15:00","endTime":"16:30"},{"day":"Wed","startTime":"15:00","endTime":"16:30"}]
+
+Return only valid JSON array, nothing else.`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.0-flash',
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+  });
+
+  const text = response.text ?? '';
+  // Strip any accidental markdown code fences
+  const cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
+  const parsed = JSON.parse(cleaned) as ParsedOccurrence[];
+  if (!Array.isArray(parsed)) throw new Error('Expected JSON array from Gemini');
+  return parsed;
+}
+
+// ---------------------------------------------------------------------------
+// Helper: format a time string for display (e.g. "07:15" → "7:15am")
+// ---------------------------------------------------------------------------
+
+function formatTime(t: string): string {
+  const [hStr, mStr] = t.split(':');
+  const h = parseInt(hStr, 10);
+  const m = parseInt(mStr, 10);
+  if (isNaN(h) || isNaN(m)) return t;
+  const period = h < 12 ? 'am' : 'pm';
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return m === 0 ? `${h12}${period}` : `${h12}:${mStr}${period}`;
+}
+
+// ---------------------------------------------------------------------------
+// Helper: summarise schedule for display
+// ---------------------------------------------------------------------------
+
+interface ActivitySummary {
+  name: string;
+  /** Human-readable list of occurrences, e.g. "Mon–Fri 7:15–8:15am" */
+  summary: string;
+  /** The raw occurrences so we can remove them by day */
+  occurrences: ParsedOccurrence[];
+}
+
+/**
+ * Group the current schedule state into per-activity summaries for display.
+ * We reverse-engineer activities from the schedule by grouping entries with
+ * the same name across days.
+ */
+function buildActivitySummaries(
+  schedule: Partial<Record<DayOfWeek, ScheduleEntry[]>>,
+): ActivitySummary[] {
+  // Collect all (day, entry) pairs
+  const all: Array<{ day: DayOfWeek; entry: ScheduleEntry }> = [];
+  for (const [day, entries] of Object.entries(schedule) as [DayOfWeek, ScheduleEntry[]][]) {
+    for (const entry of entries) {
+      all.push({ day, entry });
+    }
+  }
+
+  // Group by activity name + time (same name + same times = same activity)
+  const groups = new Map<string, { name: string; occurrences: ParsedOccurrence[] }>();
+  for (const { day, entry } of all) {
+    const key = `${entry.name}|${entry.startTime}|${entry.endTime}`;
+    if (!groups.has(key)) {
+      groups.set(key, { name: entry.name, occurrences: [] });
+    }
+    groups.get(key)!.occurrences.push({ day, startTime: entry.startTime, endTime: entry.endTime });
+  }
+
+  const ORDER: DayOfWeek[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  return Array.from(groups.values()).map(({ name, occurrences }) => {
+    // Sort occurrences by day order
+    occurrences.sort((a, b) => ORDER.indexOf(a.day) - ORDER.indexOf(b.day));
+
+    // Build a compact day list, e.g. "Mon–Fri" or "Mon, Wed, Fri"
+    const days = occurrences.map((o) => o.day);
+    let dayStr: string;
+    const isConsecutive = days.every((d, i) => i === 0 || ORDER.indexOf(d) === ORDER.indexOf(days[i - 1]) + 1);
+    if (days.length > 2 && isConsecutive) {
+      dayStr = `${days[0]}–${days[days.length - 1]}`;
+    } else {
+      dayStr = days.join(', ');
+    }
+
+    const { startTime, endTime } = occurrences[0];
+    const timeStr = `${formatTime(startTime)}–${formatTime(endTime)}`;
+
+    return {
+      name,
+      summary: `${dayStr} · ${timeStr}`,
+      occurrences,
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -60,87 +198,91 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
-function TimeInput({
-  value,
-  onChange,
-  placeholder,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <input
-      type="time"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className="px-2 py-1.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-28"
-    />
-  );
-}
+// ---------------------------------------------------------------------------
+// AddActivityForm — inline form shown when user taps "Add Activity"
+// ---------------------------------------------------------------------------
 
-function DayScheduleEditor({
-  label,
-  entries,
+function AddActivityForm({
   onAdd,
-  onUpdate,
-  onRemove,
+  onCancel,
 }: {
-  day: DayOfWeek;
-  label: string;
-  entries: ScheduleEntry[];
-  onAdd: () => void;
-  onUpdate: (idx: number, entry: ScheduleEntry) => void;
-  onRemove: (idx: number) => void;
+  onAdd: (name: string, occurrences: ParsedOccurrence[]) => void;
+  onCancel: () => void;
 }) {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [parsing, setParsing] = useState(false);
+  const [parseError, setParseError] = useState('');
+
+  const handleParse = async () => {
+    if (!name.trim() || !description.trim()) return;
+    setParsing(true);
+    setParseError('');
+    try {
+      const apiKey = getConfig().geminiApiKey;
+      if (!apiKey) throw new Error('No Gemini API key configured');
+      const occurrences = await parseScheduleWithGemini(name.trim(), description.trim(), apiKey);
+      if (occurrences.length === 0) {
+        setParseError("Couldn't find any day/time patterns — try rephrasing.");
+        return;
+      }
+      onAdd(name.trim(), occurrences);
+    } catch (err) {
+      setParseError(`Parse failed: ${String(err)}`);
+    } finally {
+      setParsing(false);
+    }
+  };
+
   return (
-    <div>
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-sm font-medium text-slate-700">{label}</span>
+    <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50">
+      <div>
+        <label className="block text-xs font-medium text-slate-600 mb-1">Activity name</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. School drop-off"
+          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          autoFocus
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-slate-600 mb-1">When does it happen?</label>
+        <input
+          type="text"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleParse(); }}
+          placeholder="e.g. Every weekday from 7:15 to 8:15"
+          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+      {parseError && (
+        <p className="text-xs text-red-600">{parseError}</p>
+      )}
+      <div className="flex gap-2">
         <button
-          onClick={onAdd}
-          className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+          onClick={handleParse}
+          disabled={parsing || !name.trim() || !description.trim()}
+          className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          + Add
+          {parsing ? 'Parsing…' : 'Add →'}
+        </button>
+        <button
+          onClick={onCancel}
+          className="px-4 py-2 text-slate-500 text-sm hover:text-slate-700 transition-colors"
+        >
+          Cancel
         </button>
       </div>
-      {entries.length === 0 ? (
-        <p className="text-xs text-slate-400 ml-0.5">No activities</p>
-      ) : (
-        <div className="space-y-1.5">
-          {entries.map((entry, idx) => (
-            <div key={idx} className="flex items-center gap-2">
-              <input
-                type="text"
-                value={entry.name}
-                onChange={(e) => onUpdate(idx, { ...entry, name: e.target.value })}
-                placeholder="Activity"
-                className="flex-1 px-2 py-1.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0"
-              />
-              <TimeInput
-                value={entry.startTime}
-                onChange={(v) => onUpdate(idx, { ...entry, startTime: v })}
-              />
-              <span className="text-slate-400 text-sm shrink-0">–</span>
-              <TimeInput
-                value={entry.endTime}
-                onChange={(v) => onUpdate(idx, { ...entry, endTime: v })}
-              />
-              <button
-                onClick={() => onRemove(idx)}
-                className="text-slate-400 hover:text-red-500 text-lg leading-none shrink-0 px-1"
-                aria-label="Remove"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Main SettingsPage
+// ---------------------------------------------------------------------------
 
 export function SettingsPage() {
   const { user } = useAuth();
@@ -155,6 +297,7 @@ export function SettingsPage() {
   // Routine fields
   const [schedule, setSchedule] = useState<Partial<Record<DayOfWeek, ScheduleEntry[]>>>({});
   const [windowMinutes, setWindowMinutes] = useState(30);
+  const [showAddForm, setShowAddForm] = useState(false);
 
   // Location fields
   const [homeCity, setHomeCity] = useState('');
@@ -206,33 +349,35 @@ export function SettingsPage() {
     }
   };
 
-  const addEntry = (day: DayOfWeek) => {
-    setSchedule((prev) => ({
-      ...prev,
-      [day]: [...(prev[day] ?? []), { ...EMPTY_ENTRY }],
-    }));
-  };
-
-  const updateEntry = (day: DayOfWeek, idx: number, entry: ScheduleEntry) => {
+  const handleActivityAdded = (name: string, occurrences: ParsedOccurrence[]) => {
     setSchedule((prev) => {
-      const entries = [...(prev[day] ?? [])];
-      entries[idx] = entry;
-      return { ...prev, [day]: entries };
-    });
-  };
-
-  const removeEntry = (day: DayOfWeek, idx: number) => {
-    setSchedule((prev) => {
-      const entries = (prev[day] ?? []).filter((_, i) => i !== idx);
       const next = { ...prev };
-      if (entries.length === 0) {
-        delete next[day];
-      } else {
-        next[day] = entries;
+      for (const { day, startTime, endTime } of occurrences) {
+        next[day] = [...(next[day] ?? []), { name, startTime, endTime }];
+      }
+      return next;
+    });
+    setShowAddForm(false);
+  };
+
+  const handleRemoveActivity = (summary: ActivitySummary) => {
+    setSchedule((prev) => {
+      const next = { ...prev };
+      for (const { day, startTime, endTime } of summary.occurrences) {
+        const entries = (next[day] ?? []).filter(
+          (e) => !(e.name === summary.name && e.startTime === startTime && e.endTime === endTime),
+        );
+        if (entries.length === 0) {
+          delete next[day];
+        } else {
+          next[day] = entries;
+        }
       }
       return next;
     });
   };
+
+  const activities = buildActivitySummaries(schedule);
 
   const handleSaveLocation = async () => {
     if (!user) return;
@@ -303,47 +448,47 @@ export function SettingsPage() {
       {/* Schedule */}
       <Section title="Weekly Schedule">
         <p className="text-sm text-slate-500 -mt-1">
-          List activities for each day with start and end times. CarBot uses this to understand
-          what you're most likely doing when a session starts.
+          Add recurring activities. CarBot uses this to understand what you're most likely doing when a session starts.
         </p>
 
-        <div className="space-y-5">
-          {/* Weekdays */}
-          <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Weekdays</p>
-            <div className="space-y-4">
-              {(['Mon', 'Tue', 'Wed', 'Thu', 'Fri'] as DayOfWeek[]).map((day) => (
-                <DayScheduleEditor
-                  key={day}
-                  day={day}
-                  label={DAY_LABELS[day]}
-                  entries={schedule[day] ?? []}
-                  onAdd={() => addEntry(day)}
-                  onUpdate={(idx, entry) => updateEntry(day, idx, entry)}
-                  onRemove={(idx) => removeEntry(day, idx)}
-                />
-              ))}
-            </div>
+        {/* Activity list */}
+        {activities.length > 0 && (
+          <div className="space-y-2">
+            {activities.map((activity, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+              >
+                <div>
+                  <p className="text-sm font-medium text-slate-800">{activity.name}</p>
+                  <p className="text-xs text-slate-500">{activity.summary}</p>
+                </div>
+                <button
+                  onClick={() => handleRemoveActivity(activity)}
+                  className="text-slate-400 hover:text-red-500 text-lg leading-none px-1 ml-3 shrink-0"
+                  aria-label="Remove"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
           </div>
+        )}
 
-          {/* Weekend */}
-          <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Weekend</p>
-            <div className="space-y-4">
-              {(['Sat', 'Sun'] as DayOfWeek[]).map((day) => (
-                <DayScheduleEditor
-                  key={day}
-                  day={day}
-                  label={DAY_LABELS[day]}
-                  entries={schedule[day] ?? []}
-                  onAdd={() => addEntry(day)}
-                  onUpdate={(idx, entry) => updateEntry(day, idx, entry)}
-                  onRemove={(idx) => removeEntry(day, idx)}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
+        {/* Add activity form or button */}
+        {showAddForm ? (
+          <AddActivityForm
+            onAdd={handleActivityAdded}
+            onCancel={() => setShowAddForm(false)}
+          />
+        ) : (
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="w-full px-4 py-2.5 border-2 border-dashed border-slate-300 text-slate-500 text-sm rounded-xl hover:border-blue-400 hover:text-blue-600 transition-colors"
+          >
+            + Add Activity
+          </button>
+        )}
 
         <Field
           label="Context window"
