@@ -18,21 +18,20 @@
  * Three sections:
  *   1. Profile — child's name, email summaries
  *   2. Routine — freeform activity input parsed by Gemini Flash
- *   3. Location — home city, school name
+ *   3. Locations — named places (home, school, etc.) resolved via Maps geocoding
  */
 
 import React, { useState, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
-import { useAuth } from '@andyfooblah/voicecommon';
-import { getConfig } from '@andyfooblah/voicecommon';
+import { useAuth, getConfig } from '@andyfooblah/voicecommon';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import {
   saveRoutine,
-  saveLocationConfig,
+  saveLocations,
   saveChildName,
   saveEmailSummariesEnabled,
 } from '../../services/userProfile';
-import type { DayOfWeek, Routine, ScheduleEntry, LocationConfig } from '../../types';
+import type { DayOfWeek, Routine, ScheduleEntry, NamedLocation } from '../../types';
 
 const DAY_LABELS: Record<DayOfWeek, string> = {
   Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday',
@@ -94,6 +93,32 @@ Return only valid JSON array, nothing else.`;
   const parsed = JSON.parse(cleaned) as ParsedOccurrence[];
   if (!Array.isArray(parsed)) throw new Error('Expected JSON array from Gemini');
   return parsed;
+}
+
+// ---------------------------------------------------------------------------
+// Maps geocoding helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Forward-geocode a place query to a full formatted address using the
+ * Google Maps Geocoding API. Returns the query unchanged if no Maps API
+ * key is configured or if the lookup fails.
+ */
+async function resolveAddress(query: string, mapsApiKey: string | null | undefined): Promise<string> {
+  if (!mapsApiKey) return query;
+  try {
+    const encoded = encodeURIComponent(query);
+    const res = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?address=${encoded}&key=${mapsApiKey}`,
+    );
+    const data = await res.json();
+    if (data.status === 'OK' && data.results?.length > 0) {
+      return data.results[0].formatted_address as string;
+    }
+  } catch {
+    // Fall through and return the raw query
+  }
+  return query;
 }
 
 // ---------------------------------------------------------------------------
@@ -281,6 +306,83 @@ function AddActivityForm({
 }
 
 // ---------------------------------------------------------------------------
+// AddLocationForm — inline form for adding a named location
+// ---------------------------------------------------------------------------
+
+function AddLocationForm({
+  onAdd,
+  onCancel,
+}: {
+  onAdd: (loc: NamedLocation) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState('');
+  const [query, setQuery] = useState('');
+  const [resolving, setResolving] = useState(false);
+  const [resolveError, setResolveError] = useState('');
+
+  const handleAdd = async () => {
+    if (!name.trim() || !query.trim()) return;
+    setResolving(true);
+    setResolveError('');
+    try {
+      const mapsApiKey = getConfig().mapsApiKey;
+      const resolvedAddress = await resolveAddress(query.trim(), mapsApiKey);
+      onAdd({ name: name.trim().toLowerCase(), query: query.trim(), resolvedAddress });
+    } catch (err) {
+      setResolveError(`Failed: ${String(err)}`);
+    } finally {
+      setResolving(false);
+    }
+  };
+
+  return (
+    <div className="border border-slate-200 rounded-xl p-4 space-y-3 bg-slate-50">
+      <div>
+        <label className="block text-xs font-medium text-slate-600 mb-1">Name</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. home, school, hockey rink"
+          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          autoFocus
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-slate-600 mb-1">Address or place name</label>
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }}
+          placeholder="e.g. Lincoln Elementary, Palo Alto or 100 Main St"
+          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+      {resolveError && (
+        <p className="text-xs text-red-600">{resolveError}</p>
+      )}
+      <div className="flex gap-2">
+        <button
+          onClick={handleAdd}
+          disabled={resolving || !name.trim() || !query.trim()}
+          className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {resolving ? 'Looking up…' : 'Add →'}
+        </button>
+        <button
+          onClick={onCancel}
+          className="px-4 py-2 text-slate-500 text-sm hover:text-slate-700 transition-colors"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main SettingsPage
 // ---------------------------------------------------------------------------
 
@@ -300,9 +402,8 @@ export function SettingsPage() {
   const [showAddForm, setShowAddForm] = useState(false);
 
   // Location fields
-  const [homeCity, setHomeCity] = useState('');
-  const [schoolName, setSchoolName] = useState('');
-  const [schoolAddress, setSchoolAddress] = useState('');
+  const [locations, setLocations] = useState<NamedLocation[]>([]);
+  const [showAddLocationForm, setShowAddLocationForm] = useState(false);
 
   // Initialize from profile
   useEffect(() => {
@@ -314,9 +415,7 @@ export function SettingsPage() {
       setWindowMinutes(profile.routine.contextWindowMinutes ?? 30);
     }
     if (profile.locations) {
-      setHomeCity(profile.locations.homeCity);
-      setSchoolName(profile.locations.schoolName);
-      setSchoolAddress(profile.locations.schoolAddress ?? '');
+      setLocations(profile.locations);
     }
   }, [profile]);
 
@@ -379,16 +478,20 @@ export function SettingsPage() {
 
   const activities = buildActivitySummaries(schedule);
 
-  const handleSaveLocation = async () => {
+  const handleLocationAdded = (loc: NamedLocation) => {
+    setLocations((prev) => [...prev, loc]);
+    setShowAddLocationForm(false);
+  };
+
+  const handleRemoveLocation = (index: number) => {
+    setLocations((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSaveLocations = async () => {
     if (!user) return;
     try {
-      const locations: LocationConfig = {
-        homeCity,
-        schoolName,
-        ...(schoolAddress ? { schoolAddress } : {}),
-      };
-      await saveLocationConfig(user.uid, locations);
-      flash('Location saved');
+      await saveLocations(user.uid, locations);
+      flash('Locations saved');
       refetch();
     } catch (err) {
       setError(String(err));
@@ -516,40 +619,56 @@ export function SettingsPage() {
         </button>
       </Section>
 
-      {/* Location */}
-      <Section title="Location">
-        <Field label="Home city / neighborhood" hint="Used when geolocation is unavailable (never stored with sessions)">
-          <input
-            type="text"
-            value={homeCity}
-            onChange={(e) => setHomeCity(e.target.value)}
-            placeholder="e.g. Palo Alto, CA"
-            className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+      {/* Locations */}
+      <Section title="Locations">
+        <p className="text-sm text-slate-500 -mt-1">
+          Name the places you travel to. CarBot uses these so you can refer to them naturally in conversation.
+        </p>
+
+        {/* Location list */}
+        {locations.length > 0 && (
+          <div className="space-y-2">
+            {locations.map((loc, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-800">{loc.name}</p>
+                  <p className="text-xs text-slate-500 truncate">{loc.resolvedAddress}</p>
+                </div>
+                <button
+                  onClick={() => handleRemoveLocation(i)}
+                  className="text-slate-400 hover:text-red-500 text-lg leading-none px-1 ml-3 shrink-0"
+                  aria-label="Remove"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Add location form or button */}
+        {showAddLocationForm ? (
+          <AddLocationForm
+            onAdd={handleLocationAdded}
+            onCancel={() => setShowAddLocationForm(false)}
           />
-        </Field>
-        <Field label="School name">
-          <input
-            type="text"
-            value={schoolName}
-            onChange={(e) => setSchoolName(e.target.value)}
-            placeholder="e.g. Lincoln Elementary"
-            className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </Field>
-        <Field label="School address (optional)" hint="Display only — not stored with sessions">
-          <input
-            type="text"
-            value={schoolAddress}
-            onChange={(e) => setSchoolAddress(e.target.value)}
-            placeholder="e.g. 100 Lincoln Ave, Palo Alto, CA"
-            className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </Field>
+        ) : (
+          <button
+            onClick={() => setShowAddLocationForm(true)}
+            className="w-full px-4 py-2.5 border-2 border-dashed border-slate-300 text-slate-500 text-sm rounded-xl hover:border-blue-400 hover:text-blue-600 transition-colors"
+          >
+            + Add Location
+          </button>
+        )}
+
         <button
-          onClick={handleSaveLocation}
+          onClick={handleSaveLocations}
           className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors"
         >
-          Save Location
+          Save Locations
         </button>
       </Section>
     </div>

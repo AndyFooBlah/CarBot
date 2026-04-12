@@ -77,18 +77,20 @@ export type TripContext =
 // ---------------------------------------------------------------------------
 
 /**
- * User-configured location names.
- * Stored in `users/{uid}.locations`.
- * Only human-readable names — never raw coordinates.
+ * A single user-defined named location.
+ * Stored as an array in `users/{uid}.locations`.
  */
-export interface LocationConfig {
-  /** Home city or neighborhood, e.g. "Palo Alto, CA". */
-  homeCity: string;
-  /** School name, e.g. "Lincoln Elementary". */
-  schoolName: string;
-  /** Optional: school address for display only. */
-  schoolAddress?: string;
+export interface NamedLocation {
+  /** Short label used in conversation, e.g. "home", "school", "hockey rink". */
+  name: string;
+  /** The address/place query the user entered, e.g. "Lincoln Elementary, Palo Alto". */
+  query: string;
+  /** Full formatted address resolved via Maps geocoding. Equals query if no Maps key. */
+  resolvedAddress: string;
 }
+
+/** Kept for type compatibility — use NamedLocation[] on the profile instead. */
+export type LocationConfig = NamedLocation[];
 
 // ---------------------------------------------------------------------------
 // User profile (extends VoiceCommon UserProfile)
@@ -103,7 +105,7 @@ export interface CarbotUserProfile {
   createdAt: Timestamp;
   timezone?: string;
   routine?: Routine;
-  locations?: LocationConfig;
+  locations?: NamedLocation[];
   /** Child's name, used in transcript speaker labels. */
   childName?: string;
   /** Whether to receive session summary emails. Default: true. */

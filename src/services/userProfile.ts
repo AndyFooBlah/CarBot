@@ -27,7 +27,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '@andyfooblah/voicecommon';
-import type { CarbotUserProfile, Routine, LocationConfig } from '../types';
+import type { CarbotUserProfile, Routine, NamedLocation } from '../types';
 
 /** Fetch the user profile. Returns null if the document does not exist. */
 export async function getUserProfile(uid: string): Promise<CarbotUserProfile | null> {
@@ -61,8 +61,8 @@ export async function saveRoutine(uid: string, routine: Routine): Promise<void> 
   await updateDoc(doc(db, 'users', uid), { routine });
 }
 
-/** Update the location configuration. */
-export async function saveLocationConfig(uid: string, locations: LocationConfig): Promise<void> {
+/** Update the named locations list. */
+export async function saveLocations(uid: string, locations: NamedLocation[]): Promise<void> {
   await updateDoc(doc(db, 'users', uid), { locations });
 }
 

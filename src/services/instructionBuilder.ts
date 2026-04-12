@@ -89,13 +89,15 @@ If the conversation naturally wraps up, you can suggest ending the session by sa
   }
 
   // --- 3. Location ---
-  const location = currentCity ?? profile.locations?.homeCity ?? null;
-  if (location) {
-    parts.push(`You're currently in the ${location} area.`);
+  if (currentCity) {
+    parts.push(`You're currently in the ${currentCity} area.`);
   }
 
-  if (profile.locations?.schoolName && tripContext === 'school_commute_morning') {
-    parts.push(`The destination is ${profile.locations.schoolName}.`);
+  if (profile.locations && profile.locations.length > 0) {
+    const locationList = profile.locations
+      .map((l) => `${l.name} (${l.resolvedAddress})`)
+      .join(', ');
+    parts.push(`Known locations: ${locationList}.`);
   }
 
   // --- 4. Recent memories (async) ---
