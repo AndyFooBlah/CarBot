@@ -67,12 +67,10 @@ service cloud.firestore {
         );
       allow delete: if isOwner(resource.data.userId);
 
-      // Raw and clean transcripts (subcollection documents)
+      // Raw transcript written by the client in real-time during a session.
       match /transcript/{docId} {
-        allow read: if isAuth()
+        allow read, write: if isAuth()
           && get(/databases/$(database)/documents/sessions/$(sessionId)).data.userId == request.auth.uid;
-        // Only Cloud Functions write transcript documents — not clients.
-        allow write: if false;
       }
 
       // Transcript edits written by the client
