@@ -1,0 +1,153 @@
+// Copyright 2026 Andrew Brook
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------------------
+    // Helper functions
+    // ---------------------------------------------------------------------------
+
+    /** True if the caller is authenticated. */
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    /** True if the caller's uid matches the given userId. */
+    function isOwner(userId) {
+      return isAuth() && request.auth.uid == userId;
+    }
+
+    /** True if a field is present in the incoming data. */
+    function has(field) {
+      return field in request.resource.data;
+    }
+
+    /** True if the userId field in the incoming data matches the caller. */
+    function incomingUserIdMatches() {
+      return has('userId') && request.resource.data.userId == request.auth.uid;
+    }
+
+    // ---------------------------------------------------------------------------
+    // User profiles
+    // ---------------------------------------------------------------------------
+
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Sessions
+    // ---------------------------------------------------------------------------
+
+    // Users can only access their own sessions.
+    match /sessions/{sessionId} {
+      allow read: if isAuth() && resource.data.userId == request.auth.uid;
+      allow create: if isAuth() && incomingUserIdMatches();
+      // Updates allowed only by the session owner; status can only advance
+      // (active → completed | interrupted), never go backward to active.
+      allow update: if isAuth()
+        && resource.data.userId == request.auth.uid
+        && (
+          !has('status') ||
+          request.resource.data.status in ['completed', 'interrupted', 'active']
+        );
+      allow delete: if isOwner(resource.data.userId);
+
+      // Raw and clean transcripts (subcollection documents)
+      match /transcript/{docId} {
+        allow read: if isAuth()
+          && get(/databases/$(database)/documents/sessions/$(sessionId)).data.userId == request.auth.uid;
+        // Only Cloud Functions write transcript documents — not clients.
+        allow write: if false;
+      }
+
+      // Transcript edits written by the client
+      match /transcriptEdits/{editId} {
+        allow read: if isAuth()
+          && get(/databases/$(database)/documents/sessions/$(sessionId)).data.userId == request.auth.uid;
+        allow create: if isAuth()
+          && get(/databases/$(database)/documents/sessions/$(sessionId)).data.userId == request.auth.uid
+          && request.resource.data.keys().hasAll(['type', 'entries', 'editedAt'])
+          && request.resource.data.type in ['entries', 'clean'];
+        // Edits are immutable — no updates or deletes from the client.
+        allow update, delete: if false;
+      }
+
+      // Session-level memory facts (written by Cloud Functions only)
+      match /memories/{docId} {
+        allow read: if isAuth()
+          && get(/databases/$(database)/documents/sessions/$(sessionId)).data.userId == request.auth.uid;
+        allow write: if false;
+      }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Cross-session memory index
+    // ---------------------------------------------------------------------------
+
+    match /memories/{memoryId} {
+      allow read: if isAuth() && resource.data.userId == request.auth.uid;
+      // Clients may update their own memories (e.g. to mark edited=true)
+      // but cannot change the userId, sessionId, or createdAt.
+      allow update: if isAuth()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.sessionId == resource.data.sessionId
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isAuth() && resource.data.userId == request.auth.uid;
+      // Memories are created by Cloud Functions only.
+      allow create: if false;
+    }
+
+    // ---------------------------------------------------------------------------
+    // Context documents
+    // ---------------------------------------------------------------------------
+
+    match /context_documents/{docId} {
+      allow read: if isAuth() && resource.data.userId == request.auth.uid;
+      allow create: if isAuth()
+        && incomingUserIdMatches()
+        && request.resource.data.keys().hasAll(['userId', 'title', 'source', 'content', 'active', 'createdAt', 'updatedAt'])
+        && request.resource.data.source in ['upload', 'email', 'text'];
+      allow update: if isAuth()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == resource.data.userId;
+      allow delete: if isAuth() && resource.data.userId == request.auth.uid;
+    }
+
+    // ---------------------------------------------------------------------------
+    // Ingested emails
+    // ---------------------------------------------------------------------------
+
+    // Emails are written exclusively by Cloud Functions.
+    // Users can read (not write) their own emails.
+    match /emails/{emailId} {
+      allow read: if isAuth() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    // ---------------------------------------------------------------------------
+    // System / internal documents
+    // ---------------------------------------------------------------------------
+
+    // The Gmail polling state document is internal — no client access.
+    match /system/{docId} {
+      allow read, write: if false;
+    }
+
+  }
+}
