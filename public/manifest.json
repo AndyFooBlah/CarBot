@@ -1,0 +1,10 @@
+{
+  "name": "CarBot",
+  "short_name": "CarBot",
+  "description": "AI companion for car rides",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#2563eb",
+  "icons": []
+}
