@@ -27,10 +27,13 @@ service firebase.storage {
     // Only WebM audio files are accepted (VoiceCommon records in WebM/Opus).
     // ---------------------------------------------------------------------------
 
-    match /sessions/{userId}/{sessionId}.webm {
-      allow read: if request.auth != null && request.auth.uid == userId;
+    match /sessions/{userId}/{fileName} {
+      allow read: if request.auth != null
+        && request.auth.uid == userId
+        && fileName.matches('.*\\.webm');
       allow write: if request.auth != null
         && request.auth.uid == userId
+        && fileName.matches('.*\\.webm')
         && request.resource.size < 500 * 1024 * 1024
         && request.resource.contentType.matches('audio/.*');
     }
