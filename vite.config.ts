@@ -27,8 +27,8 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
-    // Prevent duplicate React instances when VoiceCommon is a local package
-    dedupe: ['react', 'react-dom'],
+    // Prevent duplicate instances of shared singletons when VoiceCommon is a local package
+    dedupe: ['react', 'react-dom', 'firebase', 'firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage', 'firebase/functions'],
   },
   // pdfjs-dist ships a worker as a separate file; tell Vite not to inline it
   optimizeDeps: {
