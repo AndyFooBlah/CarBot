@@ -114,8 +114,8 @@ export async function generateCleanTranscript(
     return;
   }
 
-  const data = await res.json();
-  const rawText: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  const data = await res.json() as Record<string, unknown>;
+  const rawText: string = (data as any).candidates?.[0]?.content?.parts?.[0]?.text ?? '';
 
   let cleanedEntries: TranscriptEntry[];
   try {

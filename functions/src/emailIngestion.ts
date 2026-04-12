@@ -218,7 +218,7 @@ export async function ingestEmails(): Promise<void> {
         latestHistoryId = msg.historyId;
       }
 
-      const headers = msg.payload?.headers ?? [];
+      const headers = (msg.payload?.headers ?? []) as Array<{ name?: string; value?: string }>;
       const from = getHeader(headers, 'from');
       const subject = getHeader(headers, 'subject');
       const dateHeader = getHeader(headers, 'date');
@@ -246,7 +246,7 @@ export async function ingestEmails(): Promise<void> {
       }
 
       // Extract body text
-      const body = extractPlainText(msg.payload).slice(0, MAX_BODY_CHARS);
+      const body = extractPlainText(msg.payload as Parameters<typeof extractPlainText>[0]).slice(0, MAX_BODY_CHARS);
       if (!body.trim()) {
         console.log(`[emailIngestion] Empty body for message ${messageId}`);
         await gmail.users.messages.modify({

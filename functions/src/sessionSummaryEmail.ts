@@ -176,8 +176,8 @@ export async function sendSessionSummaryEmail(sessionId: string): Promise<void> 
     );
 
     if (res.ok) {
-      const data = await res.json();
-      const generated: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+      const data = await res.json() as Record<string, unknown>;
+      const generated: string = (data as any).candidates?.[0]?.content?.parts?.[0]?.text ?? '';
       if (generated.trim()) summaryBody = generated.trim();
     } else {
       console.warn('[sessionSummaryEmail] Gemini summary failed, using fallback');

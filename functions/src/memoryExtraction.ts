@@ -165,8 +165,8 @@ export async function extractMemoriesFromSession(sessionId: string): Promise<voi
     return;
   }
 
-  const data = await res.json();
-  const rawText: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+  const data = await res.json() as Record<string, unknown>;
+  const rawText: string = (data as any).candidates?.[0]?.content?.parts?.[0]?.text ?? '';
   const { facts, summary } = parseResponse(rawText);
 
   const now = Timestamp.now();
