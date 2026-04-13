@@ -66,7 +66,7 @@ export function useCarbotSession(options: UseCarbotSessionOptions): UseCarbotSes
     userId,
     systemInstruction,
     tools: allTools,
-    autoGreet: true,
+    autoGreetText: '[Session started. Please greet the family and begin the conversation as described in your instructions.]',
     onToolCall: async (name: string, args: Record<string, unknown>) => {
       switch (name) {
         case 'getWeather':
