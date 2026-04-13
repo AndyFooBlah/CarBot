@@ -30,6 +30,7 @@
 import { getMemoryContextString } from './memories';
 import { getActiveContextDocuments, buildContextDocumentSection } from './contextDocuments';
 import { inferTripContext, tripContextToDescription, getDayScheduleSummary } from './tripContext';
+import { getRecentSessionTimestamps } from './sessions';
 import type { CarbotUserProfile, TripContext } from '../types';
 
 export interface SessionContext {
@@ -82,14 +83,16 @@ Keep your opening to 1–2 short spoken sentences: start with a warm greeting, t
 Vary your phrasing each session — don't repeat the same opening. Do not exceed two short sentences.`);
 
   // --- 2. Date, time, and trip context ---
+  const tz = profile.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const dateStr = now.toLocaleDateString('en-US', {
+    timeZone: tz,
     weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
   });
-  const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  parts.push(`Current date and time: ${dateStr}, ${timeStr}.`);
+  const timeStr = now.toLocaleTimeString('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit' });
+  parts.push(`Current date and time: ${dateStr}, ${timeStr} (${tz}).`);
 
   const tripDesc = tripContextToDescription(tripContext, now, profile.routine);
   if (tripDesc) {
@@ -114,7 +117,17 @@ Vary your phrasing each session — don't repeat the same opening. Do not exceed
     parts.push(`Known locations: ${locationList}.`);
   }
 
-  // --- 4. Recent memories (async) ---
+  // --- 4. Recent session timestamps ---
+  try {
+    const sessionHistory = await getRecentSessionTimestamps(userId, tz, 3);
+    if (sessionHistory) {
+      parts.push(sessionHistory);
+    }
+  } catch (err) {
+    console.error('[instructionBuilder] Failed to load session timestamps:', err);
+  }
+
+  // --- 5. Recent memories (async) ---
   try {
     const memoryContext = await getMemoryContextString(userId, 20);
     if (memoryContext) {
@@ -124,7 +137,7 @@ Vary your phrasing each session — don't repeat the same opening. Do not exceed
     console.error('[instructionBuilder] Failed to load memories:', err);
   }
 
-  // --- 5. Active context documents (async) ---
+  // --- 6. Active context documents (async) ---
   try {
     const activeDocs = await getActiveContextDocuments(userId);
     const docSection = buildContextDocumentSection(activeDocs);

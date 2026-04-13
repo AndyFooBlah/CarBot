@@ -18,8 +18,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '@andyfooblah/voicecommon';
-import { getCarbotSessions, tripContextLabel } from '../../services/sessions';
+import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { useAuth, db } from '@andyfooblah/voicecommon';
+import { tripContextLabel } from '../../services/sessions';
 import type { CarbotSession } from '../../services/sessions';
 
 function formatDuration(seconds: number): string {
@@ -50,10 +51,25 @@ export function SessionList() {
 
   useEffect(() => {
     if (!user) return;
-    getCarbotSessions(user.uid)
-      .then(setSessions)
-      .catch((err) => setError(String(err)))
-      .finally(() => setLoading(false));
+    // Use a real-time listener so the list updates immediately after a session
+    // ends, and so navigation back to this page never shows a stale spinner.
+    const q = query(
+      collection(db, 'sessions'),
+      where('userId', '==', user.uid),
+      orderBy('startTime', 'desc'),
+    );
+    const unsubscribe = onSnapshot(
+      q,
+      (snap) => {
+        setSessions(snap.docs.map((d) => ({ ...d.data(), id: d.id }) as CarbotSession));
+        setLoading(false);
+      },
+      (err) => {
+        setError(String(err));
+        setLoading(false);
+      },
+    );
+    return unsubscribe;
   }, [user]);
 
   if (loading) {

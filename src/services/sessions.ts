@@ -67,6 +67,51 @@ export async function getCarbotSessions(userId: string): Promise<CarbotSession[]
 }
 
 /**
+ * Fetch the start times of the most recent completed sessions.
+ * Used for injecting session history context into the system instruction.
+ *
+ * @param userId - The authenticated user's UID.
+ * @param timezone - IANA timezone string for formatting, e.g. "America/Los_Angeles".
+ * @param maxSessions - Maximum sessions to retrieve (default 3).
+ * @returns Formatted string listing past session times, or null if none.
+ */
+export async function getRecentSessionTimestamps(
+  userId: string,
+  timezone: string,
+  maxSessions = 3,
+): Promise<string | null> {
+  const snap = await getDocs(
+    query(
+      collection(db, 'sessions'),
+      where('userId', '==', userId),
+      where('status', '==', 'completed'),
+      orderBy('startTime', 'desc'),
+      limit(maxSessions),
+    ),
+  );
+
+  if (snap.empty) return null;
+
+  const lines = snap.docs.map((d) => {
+    const data = d.data();
+    const date: Date | undefined = data.startTime?.toDate?.();
+    if (!date) return null;
+    const formatted = date.toLocaleString('en-US', {
+      timeZone: timezone,
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+    return `• ${formatted}`;
+  }).filter(Boolean);
+
+  if (lines.length === 0) return null;
+  return `Last ${lines.length} session${lines.length > 1 ? 's' : ''}:\n${lines.join('\n')}`;
+}
+
+/**
  * Fetch one-line summaries from the most recent completed sessions.
  * Used for injecting session history into the system instruction.
  *

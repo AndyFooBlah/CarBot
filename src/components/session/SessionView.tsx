@@ -52,7 +52,9 @@ export function SessionView() {
     },
     onSessionEndRequest: useCallback(async () => {
       await stopSession();
-    }, []),
+      // Navigate to the session detail (or list if no ID) after bot-triggered end
+      navigate(sessionId ? `/sessions/${sessionId}` : '/sessions');
+    }, [sessionId]),
     onBotSpeaking: setBotSpeaking,
   });
 
