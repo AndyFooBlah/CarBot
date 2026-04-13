@@ -119,7 +119,7 @@ Vary your phrasing each session — don't repeat the same opening. Do not exceed
 
   // --- 4. Recent session timestamps ---
   try {
-    const sessionHistory = await getRecentSessionTimestamps(userId, tz, 3);
+    const sessionHistory = await getRecentSessionTimestamps(userId, tz, now, 3);
     if (sessionHistory) {
       parts.push(sessionHistory);
     }

@@ -32,6 +32,7 @@ import {
   orderBy,
   limit,
   getDocs,
+  Timestamp,
 } from 'firebase/firestore';
 import { db, getUserSessions } from '@andyfooblah/voicecommon';
 import type { SessionMetadata } from '@andyfooblah/voicecommon';
@@ -70,21 +71,28 @@ export async function getCarbotSessions(userId: string): Promise<CarbotSession[]
  * Fetch the start times of the most recent completed sessions.
  * Used for injecting session history context into the system instruction.
  *
+ * Sessions that started within the last 60 seconds are excluded so the
+ * session that just ended doesn't appear to be the current one.
+ *
  * @param userId - The authenticated user's UID.
  * @param timezone - IANA timezone string for formatting, e.g. "America/Los_Angeles".
+ * @param now - The current time (used to exclude very recent sessions).
  * @param maxSessions - Maximum sessions to retrieve (default 3).
  * @returns Formatted string listing past session times, or null if none.
  */
 export async function getRecentSessionTimestamps(
   userId: string,
   timezone: string,
+  now: Date,
   maxSessions = 3,
 ): Promise<string | null> {
+  const cutoff = Timestamp.fromDate(new Date(now.getTime() - 60_000));
   const snap = await getDocs(
     query(
       collection(db, 'sessions'),
       where('userId', '==', userId),
       where('status', '==', 'completed'),
+      where('startTime', '<', cutoff),
       orderBy('startTime', 'desc'),
       limit(maxSessions),
     ),
