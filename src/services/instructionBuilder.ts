@@ -91,8 +91,8 @@ Vary your phrasing each session — don't repeat the same opening. Do not exceed
     month: 'long',
     day: 'numeric',
   });
-  const timeStr = now.toLocaleTimeString('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit' });
-  parts.push(`Current date and time: ${dateStr}, ${timeStr} (${tz}).`);
+  const timeStr = now.toLocaleTimeString('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+  parts.push(`Current date and time: ${dateStr}, ${timeStr}.`);
 
   const tripDesc = tripContextToDescription(tripContext, now, profile.routine);
   if (tripDesc) {
@@ -149,8 +149,8 @@ Vary your phrasing each session — don't repeat the same opening. Do not exceed
   }
 
   // --- 7. Knowledge tools ---
-  parts.push(`TOOLS — use these to enrich the conversation when helpful:
-- Call 'searchWikipedia' whenever the user asks about any historical event, person, place, animal, science topic, or any factual question where more detail would be useful. Use the returned passages to give a natural, accurate answer — do not read them aloud word for word.
+  parts.push(`TOOLS — you have these tools available and MUST use them:
+- ALWAYS call 'searchWikipedia' before answering questions about specific facts, historical events, people, animals, places, science topics, or anything from the real world. Never answer factual questions from memory alone — always look them up first using this tool.
 - Call 'getWeather' when the user asks about the weather or mentions going somewhere.
 - Call 'searchPlace' or 'getDistanceBetweenPlaces' for location or distance questions.
 - Call 'getJoke' when the user asks for a joke or when a moment of levity feels right.`);
