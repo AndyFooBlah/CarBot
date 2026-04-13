@@ -148,6 +148,13 @@ Vary your phrasing each session — don't repeat the same opening. Do not exceed
     console.error('[instructionBuilder] Failed to load context documents:', err);
   }
 
+  // --- 7. Knowledge tools ---
+  parts.push(`TOOLS — use these to enrich the conversation when helpful:
+- Call 'searchWikipedia' whenever the user asks about any historical event, person, place, animal, science topic, or any factual question where more detail would be useful. Use the returned passages to give a natural, accurate answer — do not read them aloud word for word.
+- Call 'getWeather' when the user asks about the weather or mentions going somewhere.
+- Call 'searchPlace' or 'getDistanceBetweenPlaces' for location or distance questions.
+- Call 'getJoke' when the user asks for a joke or when a moment of levity feels right.`);
+
   return parts.join('\n\n');
 }
 
