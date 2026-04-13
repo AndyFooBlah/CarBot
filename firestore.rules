@@ -139,6 +139,18 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------------------
+    // Wikipedia article cache (shared across all users, not user-scoped)
+    // ---------------------------------------------------------------------------
+
+    match /wikipedia_cache/{articleId} {
+      allow read, write: if isAuth();
+
+      match /chunks/{chunkIndex} {
+        allow read, write: if isAuth();
+      }
+    }
+
+    // ---------------------------------------------------------------------------
     // System / internal documents
     // ---------------------------------------------------------------------------
 

@@ -78,7 +78,11 @@ export function useCarbotSession(options: UseCarbotSessionOptions): UseCarbotSes
         case 'getJoke':
           return getJoke(args.category as string | undefined);
         case 'searchWikipedia':
-          return searchWikipedia(args.query as string);
+          return searchWikipedia({
+            question: args.question as string,
+            maxChunks: args.maxChunks as number | undefined,
+            maxAgeDays: args.maxAgeDays as number | undefined,
+          });
         default:
           return `Unknown tool: ${name}`;
       }

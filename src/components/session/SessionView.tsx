@@ -34,6 +34,15 @@ export function SessionView() {
   const navigate = useNavigate();
   const [botSpeaking, setBotSpeaking] = useState(false);
 
+  // Use a ref so onSessionEndRequest can always see the latest sessionId
+  // without being recreated (which would require re-passing it to the hook).
+  const sessionIdRef = React.useRef<string | null>(null);
+
+  const onSessionEndRequest = useCallback(async () => {
+    const id = sessionIdRef.current;
+    navigate(id ? `/sessions/${id}` : '/sessions');
+  }, [navigate]);
+
   const {
     messages,
     connectionStatus,
@@ -50,13 +59,14 @@ export function SessionView() {
       displayName: user?.displayName ?? '',
       createdAt: { toMillis: () => 0 } as any,
     },
-    onSessionEndRequest: useCallback(async () => {
-      await stopSession();
-      // Navigate to the session detail (or list if no ID) after bot-triggered end
-      navigate(sessionId ? `/sessions/${sessionId}` : '/sessions');
-    }, [sessionId]),
+    onSessionEndRequest,
     onBotSpeaking: setBotSpeaking,
   });
+
+  // Keep ref in sync with the latest sessionId
+  React.useEffect(() => {
+    sessionIdRef.current = sessionId ?? null;
+  }, [sessionId]);
 
   const handleStop = async () => {
     await stopSession();
@@ -122,7 +132,7 @@ export function SessionView() {
       <div className="flex justify-center pt-4">
         {!isRecording ? (
           <button
-            onClick={startSession}
+            onClick={() => startSession()}
             disabled={isConnecting}
             className="w-32 h-32 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white shadow-lg transition-all active:scale-95 flex flex-col items-center justify-center gap-1"
           >
