@@ -27,7 +27,8 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useSession, allTools, getConfig } from '@andyfooblah/voicecommon';
+import { useSession } from '@andyfooblah/voicecommon';
+import { allKnowledgeTools, getKnowledgeConfig } from '@andyfooblah/knowledgecommon';
 import type { UseSessionReturn } from '@andyfooblah/voicecommon';
 import { getWeather } from '@andyfooblah/voicecommon';
 import { searchPlace, getDistanceBetweenPlaces } from '@andyfooblah/voicecommon';
@@ -65,7 +66,7 @@ export function useCarbotSession(options: UseCarbotSessionOptions): UseCarbotSes
   const vcSession = useSession({
     userId,
     systemInstruction,
-    tools: allTools,
+    tools: allKnowledgeTools,
     autoGreetText: '[Session started. Please greet the family and begin the conversation as described in your instructions.]',
     onToolCall: async (name: string, args: Record<string, unknown>) => {
       switch (name) {
@@ -114,7 +115,7 @@ export function useCarbotSession(options: UseCarbotSessionOptions): UseCarbotSes
     activeDocIdsRef.current = activeDocs.map((d) => d.id);
 
     // Try to get current city (non-fatal)
-    const mapsApiKey = getConfig().mapsApiKey ?? null;
+    const mapsApiKey = getKnowledgeConfig().mapsApiKey ?? null;
     const currentCity = await getCurrentCity(mapsApiKey);
 
     // Assemble the system instruction

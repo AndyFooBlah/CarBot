@@ -24,6 +24,7 @@
 import React, { useState, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { useAuth, getConfig } from '@andyfooblah/voicecommon';
+import { getKnowledgeConfig } from '@andyfooblah/knowledgecommon';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import {
   saveRoutine,
@@ -322,7 +323,7 @@ function AddLocationForm({
     setResolving(true);
     setResolveError('');
     try {
-      const mapsApiKey = getConfig().mapsApiKey;
+      const mapsApiKey = getKnowledgeConfig().mapsApiKey;
       const resolvedAddress = await resolveAddress(query.trim(), mapsApiKey);
       onAdd({ name: name.trim().toLowerCase(), query: query.trim(), resolvedAddress });
     } catch (err) {

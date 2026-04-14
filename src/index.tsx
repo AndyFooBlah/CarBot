@@ -15,16 +15,17 @@
 /**
  * CarBot application entry point.
  *
- * Initializes VoiceCommon with CarBot's Firebase and API key configuration,
- * then mounts the React app. initializeVoiceCommon() must be called before
- * any Firebase services or hooks are used.
+ * Initializes VoiceCommon (voice infrastructure) and KnowledgeCommon (knowledge
+ * tools) with CarBot's Firebase and API key configuration, then mounts the React
+ * app. Both must be called before any Firebase services, hooks, or tools are used.
  */
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
-import { initializeVoiceCommon } from '@andyfooblah/voicecommon';
+import { initializeVoiceCommon, db } from '@andyfooblah/voicecommon';
+import { initializeKnowledgeCommon } from '@andyfooblah/knowledgecommon';
 
 initializeVoiceCommon({
   firebase: {
@@ -36,7 +37,12 @@ initializeVoiceCommon({
     appId: import.meta.env.VITE_FIREBASE_APP_ID,
   },
   geminiApiKey: import.meta.env.VITE_GEMINI_API_KEY,
+});
+
+initializeKnowledgeCommon({
+  geminiApiKey: import.meta.env.VITE_GEMINI_API_KEY,
   mapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+  firestore: db,
 });
 
 const rootElement = document.getElementById('root');

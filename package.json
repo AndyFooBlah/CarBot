@@ -15,6 +15,7 @@
     "deploy:preview": "vite build && firebase hosting:channel:deploy preview"
   },
   "dependencies": {
+    "@andyfooblah/knowledgecommon": "file:../knowledgecommon",
     "@andyfooblah/voicecommon": "file:../voicecommon",
     "@google/genai": "^1.41.0",
     "firebase": "^12.9.0",
