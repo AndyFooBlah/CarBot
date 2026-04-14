@@ -28,7 +28,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSession, allTools, getConfig } from '@andyfooblah/voicecommon';
-import type { UseSessionReturn, TranscriptEntry } from '@andyfooblah/voicecommon';
+import type { UseSessionReturn } from '@andyfooblah/voicecommon';
 import { getWeather } from '@andyfooblah/voicecommon';
 import { searchPlace, getDistanceBetweenPlaces } from '@andyfooblah/voicecommon';
 import { getJoke } from '@andyfooblah/voicecommon';

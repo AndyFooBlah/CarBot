@@ -23,13 +23,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getSession, useAuth } from '@andyfooblah/voicecommon';
-import type { SessionMetadata, TranscriptEntry } from '@andyfooblah/voicecommon';
+import type { TranscriptEntry } from '@andyfooblah/voicecommon';
 import { getSessionMemories } from '../../services/memories';
 import {
   getRawTranscript,
   getCleanTranscript,
   getTranscriptHistory,
-  getActiveTranscript,
   saveTranscriptEdit,
 } from '../../services/transcriptEditor';
 import type { TranscriptType } from '../../services/transcriptEditor';
@@ -267,7 +266,7 @@ export function SessionDetail() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, user]);
 
   if (loading) {
     return <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>;

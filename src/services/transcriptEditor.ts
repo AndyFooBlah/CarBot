@@ -128,7 +128,7 @@ export async function getActiveTranscript(
 /**
  * Save a new transcript edit.
  *
- * Creates a document in `sessions/{sessionId}/transcript/edits/{newId}`.
+ * Creates a document in `sessions/{sessionId}/transcriptEdits/{newId}`.
  * The original transcript documents are never modified.
  *
  * @param sessionId - The session to edit.

@@ -92,7 +92,7 @@ carbot/
 │   │   ├── transcriptEditor.ts   # Versioned transcript edits
 │   │   ├── tripContext.ts        # Trip context inference from schedule
 │   │   └── userProfile.ts        # User profile Firestore helpers
-│   ├── __tests__/                # Vitest unit tests (56 tests)
+│   ├── __tests__/                # Vitest unit tests (87 tests)
 │   └── types.ts                  # CarBot-specific TypeScript types
 ├── functions/
 │   └── src/
@@ -280,8 +280,9 @@ npm run deploy
 npm test
 ```
 
-Tests use Vitest with jsdom. Firebase and VoiceCommon are fully mocked — no emulator or network connection needed. 56 tests across:
+Tests use Vitest with jsdom. Firebase and VoiceCommon are fully mocked — no emulator or network connection needed. 87 tests across:
 
+- `instructionBuilder.test.ts` — system instruction assembly (bot name, child name, location, tools, graceful error handling)
 - `tripContext.test.ts` — trip context inference logic (pure functions)
 - `contextDocuments.test.ts` — context document CRUD and content formatting
 - `memories.test.ts` — memory fetch and formatting

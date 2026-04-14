@@ -20,6 +20,7 @@
  */
 
 import React, { useState, useCallback } from 'react';
+import { Timestamp } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@andyfooblah/voicecommon';
 import { ConnectionStatus } from '@andyfooblah/voicecommon';
@@ -57,7 +58,7 @@ export function SessionView() {
     profile: profile ?? {
       email: user?.email ?? '',
       displayName: user?.displayName ?? '',
-      createdAt: { toMillis: () => 0 } as any,
+      createdAt: new Timestamp(0, 0),
     },
     onSessionEndRequest,
     onBotSpeaking: setBotSpeaking,
@@ -78,7 +79,6 @@ export function SessionView() {
   };
 
   const isConnecting = connectionStatus === ConnectionStatus.CONNECTING;
-  const isConnected = connectionStatus === ConnectionStatus.CONNECTED;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">

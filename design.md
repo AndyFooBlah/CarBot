@@ -74,10 +74,34 @@ All data is user-scoped. Every top-level document includes a `userId` field matc
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `schoolDays` | `string[]` | Days of week: `['Mon','Tue','Wed','Thu','Fri']` |
-| `morningDepartureTime` | `string` | HH:MM in user's local time, e.g. `"08:15"` |
-| `afternoonPickupTime` | `string` | HH:MM in user's local time, e.g. `"15:30"` |
-| `contextWindowMinutes` | `number` | How many minutes around drive time counts as commute (default: 30) |
+| `schedule` | `Partial<Record<DayOfWeek, ScheduleEntry[]>>` | Per-day activity list. Only days with activities need entries. |
+| `contextWindowMinutes` | `number` | Minutes before an activity's start (or after its end) that still count as "in transit". Default: 30. |
+
+`DayOfWeek`: `'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun'`
+
+`ScheduleEntry`:
+```typescript
+interface ScheduleEntry {
+  name: string;        // e.g. "Drop-off", "Hockey", "Piano"
+  startTime: string;   // HH:MM 24-hour local time, e.g. "07:15"
+  endTime: string;     // HH:MM 24-hour local time, e.g. "08:15"
+}
+```
+
+Example: a weekday school schedule with morning drop-off and afternoon pickup:
+```json
+{
+  "schedule": {
+    "Mon": [{ "name": "Drop-off", "startTime": "07:15", "endTime": "08:15" },
+            { "name": "Pickup",   "startTime": "15:00", "endTime": "16:00" }],
+    "Tue": [ ... ],
+    ...
+  },
+  "contextWindowMinutes": 30
+}
+```
+
+Days not present in `schedule` are treated as unscheduled. Activities are typed `'school_commute_morning'` or `'school_commute_afternoon'` based on time-of-day matching; any activity outside the two commute windows on a day with entries is `'school_day_other'`.
 
 ### 3.3 `LocationConfig` (embedded in `users/{uid}`)
 
@@ -103,9 +127,9 @@ Inherits from VoiceCommon `SessionMetadata`, plus:
 | `summary` | `string?` | One-line AI summary, set post-session |
 | `contextDocIds` | `string[]` | IDs of context docs active at session start |
 
-### 3.5 `sessions/{sessionId}/transcript/raw`
+### 3.5 `sessions/{sessionId}/transcript/entries`
 
-Single document:
+Single document (written by VoiceCommon during the session):
 ```
 {
   entries: TranscriptEntry[],   // verbatim from Gemini input transcription
@@ -126,12 +150,16 @@ Single document (written post-session by Cloud Function):
 }
 ```
 
-### 3.7 `sessions/{sessionId}/transcript/edits/{editId}` (subcollection)
+### 3.7 `sessions/{sessionId}/transcriptEdits/{editId}` (subcollection)
 
-Each edit creates a new document:
+Each edit creates a new immutable document. Note: edits live at the top-level
+subcollection `transcriptEdits`, not under `transcript/`, because Firestore
+path segments must alternate collection/document and `transcript/edits` would
+be a document path (4 segments), not a collection.
+
 ```
 {
-  type: 'raw' | 'clean',
+  type: 'entries' | 'clean',   // which transcript was edited
   entries: TranscriptEntry[],
   editedAt: Timestamp,
   note: string?                 // optional user annotation
@@ -245,7 +273,7 @@ The context is converted to a natural-language phrase in the system instruction 
 3. **Location** — city name from browser geolocation or configured home city
 4. **Recent memories** — top N facts from `memories` collection, ordered by `sessionDate DESC, importance DESC`
 5. **Active context documents** — full content for short docs (< 2000 chars), summary stub for longer ones
-6. **Recent session summaries** — one-line summaries from the last 5 sessions
+6. **Recent session timestamps** — human-readable labels for the last 3 sessions (e.g. "Monday at 8 AM"), so the bot can reference prior conversations
 
 Total assembled instruction target: ≤ 8000 tokens.
 
@@ -401,42 +429,53 @@ Gemini API key is present in the browser bundle (via `initializeVoiceCommon`). T
 ```
 src/
 ├── services/
-│   ├── tripContext.ts        # inferTripContext() and context enum
+│   ├── tripContext.ts        # inferTripContext() and schedule helpers
 │   ├── instructionBuilder.ts # buildCarbotInstruction() - assembles system instruction
 │   ├── contextDocuments.ts   # CRUD for context_documents collection
 │   ├── memories.ts           # CRUD + retrieval for memories collection
-│   ├── emailIngestion.ts     # (client-side) display/manage ingested emails
-│   └── transcriptEditor.ts  # versioned transcript edit helpers
+│   ├── sessions.ts           # CarBot session fields (tripContext, summary, etc.)
+│   ├── transcriptEditor.ts   # versioned transcript read/write helpers
+│   └── userProfile.ts        # user profile Firestore helpers
 ├── hooks/
-│   ├── useSession.ts         # wraps VoiceCommon useSession with CarBot instruction
-│   ├── useMemories.ts        # fetch + search memories
-│   └── useContextDocs.ts     # fetch + manage context documents
+│   ├── useCarbotSession.ts   # wraps VoiceCommon useSession with CarBot context
+│   └── useUserProfile.ts     # user profile read/write
 ├── components/
+│   ├── auth/
+│   │   └── LoginScreen.tsx           # Google OAuth login
 │   ├── session/
-│   │   ├── SessionView.tsx           # Live session page
-│   │   └── SessionDetail.tsx         # Past session detail + transcript editor
+│   │   ├── SessionView.tsx           # Live session page (/sessions/new)
+│   │   └── TranscriptFeed.tsx        # Real-time transcript display
 │   ├── history/
-│   │   └── SessionList.tsx           # Session history list
+│   │   ├── SessionList.tsx           # Session history list (/sessions)
+│   │   └── SessionDetail.tsx         # Session detail + transcript editor (/sessions/:id)
 │   ├── context/
-│   │   ├── ContextLibrary.tsx        # Context document management
-│   │   ├── DocumentUploader.tsx      # File + text upload UI
-│   │   └── EmailInbox.tsx            # View ingested emails
+│   │   └── ContextLibrary.tsx        # Context document management (/context)
 │   ├── memories/
-│   │   └── MemoryBrowser.tsx         # Browse + edit memory facts
+│   │   └── MemoryBrowser.tsx         # Browse + edit memory facts (/memories)
 │   ├── settings/
-│   │   ├── RoutineSettings.tsx       # School schedule config
-│   │   └── LocationSettings.tsx      # Home + school location config
+│   │   └── SettingsPage.tsx          # Routine, locations, profile config (/settings)
 │   └── shared/
-│       └── Layout.tsx
+│       ├── Layout.tsx                # Nav layout + auth guard
+│       └── ErrorBoundary.tsx         # React error boundary
+├── __tests__/                        # Vitest unit tests
+│   ├── instructionBuilder.test.ts
+│   ├── tripContext.test.ts
+│   ├── memories.test.ts
+│   ├── contextDocuments.test.ts
+│   ├── transcriptEditor.test.ts
+│   └── setup.ts
 ├── types.ts
-└── App.tsx
+├── App.tsx
+└── index.tsx
 
 functions/
 └── src/
-    ├── index.ts              # Function entry points
-    ├── memoryExtraction.ts   # extractMemories() + generateCleanTranscript()
-    ├── emailIngestion.ts     # Gmail polling + ingestEmailAsContextDocument()
-    └── sessionSummary.ts     # sendSessionSummary()
+    ├── index.ts              # Cloud Function entry points
+    ├── memoryExtraction.ts   # extractMemoriesFromSession() + generateCleanTranscript()
+    ├── cleanTranscript.ts    # generateCleanTranscript()
+    ├── sessionSummaryEmail.ts # sendSessionSummaryEmail()
+    ├── emailIngestion.ts     # Gmail inbox polling + ingestEmailAsContextDocument()
+    └── types.ts              # Shared Cloud Function types
 ```
 
 ---

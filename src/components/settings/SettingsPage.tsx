@@ -34,11 +34,6 @@ import {
 } from '../../services/userProfile';
 import type { DayOfWeek, Routine, ScheduleEntry, NamedLocation } from '../../types';
 
-const DAY_LABELS: Record<DayOfWeek, string> = {
-  Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday',
-  Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday',
-};
-
 // ---------------------------------------------------------------------------
 // Gemini schedule parser
 // ---------------------------------------------------------------------------
