@@ -33,6 +33,7 @@ import {
   saveChildName,
   saveBotName,
   saveEmailSummariesEnabled,
+  saveSelectedVoice,
 } from '../../services/userProfile';
 import type { DayOfWeek, Routine, ScheduleEntry, NamedLocation } from '../../types';
 
@@ -393,6 +394,7 @@ export function SettingsPage() {
   // Profile fields
   const [childName, setChildName] = useState('');
   const [botName, setBotName] = useState('');
+  const [selectedVoice, setSelectedVoice] = useState('Puck');
   const [emailSummaries, setEmailSummaries] = useState(true);
 
   // Routine fields
@@ -409,6 +411,7 @@ export function SettingsPage() {
     if (!profile) return;
     setChildName(profile.childName ?? '');
     setBotName(profile.botName ?? '');
+    setSelectedVoice(profile.selectedVoice ?? 'Puck');
     setEmailSummaries(profile.emailSummariesEnabled ?? true);
     if (profile.routine) {
       setSchedule(profile.routine.schedule ?? {});
@@ -429,6 +432,7 @@ export function SettingsPage() {
     try {
       await saveChildName(user.uid, childName);
       await saveBotName(user.uid, botName.trim() || 'CarBot');
+      await saveSelectedVoice(user.uid, selectedVoice);
       await saveEmailSummariesEnabled(user.uid, emailSummaries);
       flash('Profile saved');
       refetch();
@@ -529,6 +533,22 @@ export function SettingsPage() {
             placeholder="CarBot"
             className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+        </Field>
+        <Field label="Bot voice" hint="The Gemini Live voice used for speech. Takes effect on the next session.">
+          <select
+            value={selectedVoice}
+            onChange={(e) => setSelectedVoice(e.target.value)}
+            className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          >
+            <option value="Puck">Puck (default)</option>
+            <option value="Aoede">Aoede</option>
+            <option value="Charon">Charon</option>
+            <option value="Fenrir">Fenrir</option>
+            <option value="Kore">Kore</option>
+            <option value="Leda">Leda</option>
+            <option value="Orus">Orus</option>
+            <option value="Zephyr">Zephyr</option>
+          </select>
         </Field>
         <Field label="Child's name" hint="Used in transcript speaker labels and system instruction">
           <input

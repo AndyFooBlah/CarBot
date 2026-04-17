@@ -118,6 +118,8 @@ export interface CarbotUserProfile {
   botNameNeedsIntro?: boolean;
   /** Whether to receive session summary emails. Default: true. */
   emailSummariesEnabled?: boolean;
+  /** Gemini Live voice name (e.g. "Puck", "Kore"). Default: Gemini API default (Puck). */
+  selectedVoice?: string;
 }
 
 // ---------------------------------------------------------------------------

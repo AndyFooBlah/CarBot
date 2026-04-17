@@ -72,6 +72,9 @@ export function useCarbotSession(options: UseCarbotSessionOptions): UseCarbotSes
     systemInstruction,
     tools: allKnowledgeTools,
     autoGreetText: '[Session started. Please greet the family and begin the conversation as described in your instructions.]',
+    speechConfig: profile.selectedVoice ? {
+      voiceConfig: { prebuiltVoiceConfig: { voiceName: profile.selectedVoice } },
+    } : undefined,
     onToolCall: async (name: string, args: Record<string, unknown>) => {
       switch (name) {
         case 'getWeather':

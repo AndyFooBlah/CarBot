@@ -84,6 +84,11 @@ export async function markBotNameIntroduced(uid: string): Promise<void> {
   await updateDoc(doc(db, 'users', uid), { botNameNeedsIntro: false });
 }
 
+/** Update the Gemini Live voice selection. */
+export async function saveSelectedVoice(uid: string, selectedVoice: string): Promise<void> {
+  await updateDoc(doc(db, 'users', uid), { selectedVoice });
+}
+
 /** Update the email summaries enabled setting. */
 export async function saveEmailSummariesEnabled(
   uid: string,

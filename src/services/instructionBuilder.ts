@@ -150,7 +150,7 @@ Vary your phrasing each session — don't repeat the same opening. Do not exceed
 
   // --- 7. Knowledge tools ---
   parts.push(`TOOLS — you have these tools available and MUST use them:
-- ALWAYS call 'searchWikipedia' before answering questions about specific facts, historical events, people, animals, places, science topics, or anything from the real world. Never answer factual questions from memory alone — always look them up first using this tool.
+- ALWAYS call 'searchWikipedia' before answering questions about specific facts, historical events, people, animals, places, science topics, or anything from the real world. Never answer factual questions from memory alone — always look them up first. Before calling the tool, say something natural like "Let me check that on Wikipedia" or "Give me a second to look that up" — the search can take a few seconds and this keeps the conversation from feeling silent.
 - Call 'getWeather' when the user asks about the weather or mentions going somewhere.
 - Call 'searchPlace' or 'getDistanceBetweenPlaces' for location or distance questions.
 - Call 'getJoke' when the user asks for a joke or when a moment of levity feels right.`);
