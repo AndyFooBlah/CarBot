@@ -2,7 +2,7 @@
 
 A voice-first AI companion for car rides with kids. CarBot turns everyday drives into engaging conversations — answering questions, telling jokes, exploring topics, and building a memory of the family over time. Parents receive a friendly email recap after each session.
 
-Built on [VoiceCommon](https://github.com/AndyFooBlah/VoiceCommon), a reusable voice AI framework for Firebase + Gemini applications.
+Built on [`@andyfooblah/voice-common`](https://github.com/AndyFooBlah/VoiceCommon) (voice infrastructure) and [`@andyfooblah/knowledge-common`](https://github.com/AndyFooBlah/KnowledgeCommon) (knowledge tools).
 
 ---
 
@@ -55,7 +55,8 @@ Built on [VoiceCommon](https://github.com/AndyFooBlah/VoiceCommon), a reusable v
 | Layer | Technology |
 |---|---|
 | Frontend framework | React 19, TypeScript, Vite, Tailwind CSS v4 |
-| Voice AI framework | [VoiceCommon](https://github.com/AndyFooBlah/VoiceCommon) |
+| Voice AI framework | [`@andyfooblah/voice-common`](https://github.com/AndyFooBlah/VoiceCommon) v0.4.1 |
+| Knowledge tools | [`@andyfooblah/knowledge-common`](https://github.com/AndyFooBlah/KnowledgeCommon) v0.3.0 |
 | Voice model | Google Gemini Live (`gemini-2.5-flash-preview-native-audio-dialog`) |
 | Post-processing AI | Google Gemini 2.0 Flash |
 | Auth | Firebase Authentication (Google OAuth + email/password) |
@@ -155,13 +156,18 @@ npm install
 cd functions && npm install && cd ..
 ```
 
-CarBot depends on VoiceCommon as a local package (`file:../voicecommon`). Clone VoiceCommon alongside CarBot so the path resolves:
+CarBot depends on VoiceCommon and KnowledgeCommon as local packages (`file:../voicecommon`, `file:../knowledgecommon`). Clone both alongside CarBot so the paths resolve:
 
 ```bash
 # In the parent directory:
 git clone https://github.com/AndyFooBlah/VoiceCommon.git
 cd VoiceCommon && npm install && npm run build:lib && cd ..
+
+git clone https://github.com/AndyFooBlah/KnowledgeCommon.git
+cd KnowledgeCommon && npm install && npm run build:lib && cd ..
 ```
+
+Both libraries are initialized in `src/index.tsx` before the React app mounts. `initializeVoiceCommon` sets up Firebase and the Gemini API key for voice sessions; `initializeKnowledgeCommon` sets up the knowledge tools (weather, maps, jokes, Wikipedia, date/time) with the same Firestore instance and an optional Google Maps API key.
 
 ### 2. Firebase project setup
 
