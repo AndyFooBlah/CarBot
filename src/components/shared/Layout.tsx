@@ -19,7 +19,7 @@
 
 import React from 'react';
 import { Outlet, NavLink, useNavigate, Navigate } from 'react-router-dom';
-import { useAuth } from '@andyfooblah/voicecommon';
+import { useAuth } from '@andyfooblah/voice-common';
 
 export function Layout() {
   const { user, loading, signOut } = useAuth();

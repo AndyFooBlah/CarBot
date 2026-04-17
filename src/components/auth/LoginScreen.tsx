@@ -19,7 +19,7 @@
 
 import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuth, auth } from '@andyfooblah/voicecommon';
+import { useAuth, auth } from '@andyfooblah/voice-common';
 import { createUserProfile } from '../../services/userProfile';
 
 export function LoginScreen() {

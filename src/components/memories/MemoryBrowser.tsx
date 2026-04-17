@@ -21,7 +21,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '@andyfooblah/voicecommon';
+import { useAuth } from '@andyfooblah/voice-common';
 import { getMemories, updateMemory, deleteMemory } from '../../services/memories';
 import type { Memory, MemoryCategory } from '../../types';
 

@@ -19,7 +19,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
-import { useAuth, db } from '@andyfooblah/voicecommon';
+import { useAuth, db } from '@andyfooblah/voice-common';
 import { tripContextLabel } from '../../services/sessions';
 import type { CarbotSession } from '../../services/sessions';
 

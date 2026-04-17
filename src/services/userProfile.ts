@@ -26,7 +26,7 @@ import {
   updateDoc,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '@andyfooblah/voicecommon';
+import { db } from '@andyfooblah/voice-common';
 import type { CarbotUserProfile, Routine, NamedLocation } from '../types';
 
 /** Fetch the user profile. Returns null if the document does not exist. */

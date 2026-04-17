@@ -19,7 +19,7 @@ import {
   getActiveTranscript,
   saveTranscriptEdit,
 } from '../services/transcriptEditor';
-import type { TranscriptEntry } from '@andyfooblah/voicecommon';
+import type { TranscriptEntry } from '@andyfooblah/voice-common';
 import { getDoc, getDocs, addDoc } from 'firebase/firestore';
 
 // ---------------------------------------------------------------------------

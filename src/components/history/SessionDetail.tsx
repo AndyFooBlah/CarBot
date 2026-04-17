@@ -22,8 +22,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getSession, useAuth } from '@andyfooblah/voicecommon';
-import type { TranscriptEntry } from '@andyfooblah/voicecommon';
+import { getSession, useAuth } from '@andyfooblah/voice-common';
+import type { TranscriptEntry } from '@andyfooblah/voice-common';
 import { getSessionMemories } from '../../services/memories';
 import {
   getRawTranscript,

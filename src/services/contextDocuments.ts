@@ -32,7 +32,7 @@ import {
   deleteDoc,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '@andyfooblah/voicecommon';
+import { db } from '@andyfooblah/voice-common';
 import type { ContextDocument, ContextDocumentSource } from '../types';
 
 /** Maximum content length stored in Firestore (50,000 chars). */

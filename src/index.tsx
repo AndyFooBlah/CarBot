@@ -24,8 +24,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
-import { initializeVoiceCommon, db } from '@andyfooblah/voicecommon';
-import { initializeKnowledgeCommon } from '@andyfooblah/knowledgecommon';
+import { initializeVoiceCommon, db } from '@andyfooblah/voice-common';
+import { initializeKnowledgeCommon } from '@andyfooblah/knowledge-common';
 
 initializeVoiceCommon({
   firebase: {

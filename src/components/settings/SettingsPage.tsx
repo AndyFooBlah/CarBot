@@ -23,8 +23,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
-import { useAuth, getConfig } from '@andyfooblah/voicecommon';
-import { getKnowledgeConfig } from '@andyfooblah/knowledgecommon';
+import { useAuth, getConfig } from '@andyfooblah/voice-common';
+import { getKnowledgeConfig } from '@andyfooblah/knowledge-common';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import {
   saveRoutine,

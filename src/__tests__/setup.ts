@@ -16,7 +16,7 @@
  * Vitest global test setup.
  *
  * - Imports jest-dom matchers (toBeInTheDocument, etc.)
- * - Mocks the @andyfooblah/voicecommon module so tests never hit Firebase
+ * - Mocks the @andyfooblah/voice-common module so tests never hit Firebase
  */
 
 import '@testing-library/jest-dom';
@@ -26,7 +26,7 @@ import { vi } from 'vitest';
 // Mock VoiceCommon — prevents Firebase SDK initialization during tests.
 // ---------------------------------------------------------------------------
 
-vi.mock('@andyfooblah/voicecommon', () => {
+vi.mock('@andyfooblah/voice-common', () => {
   const mockDb = {};
   const mockAuth = { currentUser: null };
   const mockStorage = {};

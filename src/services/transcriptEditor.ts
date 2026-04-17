@@ -45,8 +45,8 @@ import {
   where,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '@andyfooblah/voicecommon';
-import type { TranscriptEntry } from '@andyfooblah/voicecommon';
+import { db } from '@andyfooblah/voice-common';
+import type { TranscriptEntry } from '@andyfooblah/voice-common';
 import type { TranscriptEdit } from '../types';
 
 export type TranscriptType = 'entries' | 'clean';

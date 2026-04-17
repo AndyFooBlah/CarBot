@@ -27,13 +27,17 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useSession } from '@andyfooblah/voicecommon';
-import { allKnowledgeTools, getKnowledgeConfig } from '@andyfooblah/knowledgecommon';
-import type { UseSessionReturn } from '@andyfooblah/voicecommon';
-import { getWeather } from '@andyfooblah/voicecommon';
-import { searchPlace, getDistanceBetweenPlaces } from '@andyfooblah/voicecommon';
-import { getJoke } from '@andyfooblah/voicecommon';
-import { searchWikipedia } from '@andyfooblah/voicecommon';
+import { useSession } from '@andyfooblah/voice-common';
+import type { UseSessionReturn } from '@andyfooblah/voice-common';
+import {
+  allKnowledgeTools,
+  getKnowledgeConfig,
+  getWeather,
+  searchPlace,
+  getDistanceBetweenPlaces,
+  getJoke,
+  searchWikipedia,
+} from '@andyfooblah/knowledge-common';
 import { getActiveContextDocuments } from '../services/contextDocuments';
 import { buildCarbotInstruction, getCurrentCity, computeTripContext } from '../services/instructionBuilder';
 import { setSessionCarbotFields } from '../services/sessions';

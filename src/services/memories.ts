@@ -35,7 +35,7 @@ import {
   deleteDoc,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '@andyfooblah/voicecommon';
+import { db } from '@andyfooblah/voice-common';
 import type { Memory, MemoryCategory } from '../types';
 
 // ---------------------------------------------------------------------------

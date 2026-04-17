@@ -34,8 +34,8 @@ import {
   getDocs,
   Timestamp,
 } from 'firebase/firestore';
-import { db, getUserSessions } from '@andyfooblah/voicecommon';
-import type { SessionMetadata } from '@andyfooblah/voicecommon';
+import { db, getUserSessions } from '@andyfooblah/voice-common';
+import type { SessionMetadata } from '@andyfooblah/voice-common';
 import type { CarbotSessionFields, TripContext } from '../types';
 
 /** VoiceCommon SessionMetadata extended with CarBot-specific fields. */

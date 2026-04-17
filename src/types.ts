@@ -239,7 +239,7 @@ export interface TranscriptEdit {
   id: string;
   /** Which transcript was edited. */
   type: 'entries' | 'clean';
-  entries: import('@andyfooblah/voicecommon').TranscriptEntry[];
+  entries: import('@andyfooblah/voice-common').TranscriptEntry[];
   editedAt: Timestamp;
   /** Optional user annotation. */
   note?: string;

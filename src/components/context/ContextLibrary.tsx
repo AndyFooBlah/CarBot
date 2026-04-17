@@ -20,7 +20,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useAuth } from '@andyfooblah/voicecommon';
+import { useAuth } from '@andyfooblah/voice-common';
 import {
   getContextDocuments,
   createContextDocument,

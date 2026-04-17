@@ -22,8 +22,8 @@
 import React, { useState, useCallback } from 'react';
 import { Timestamp } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@andyfooblah/voicecommon';
-import { ConnectionStatus } from '@andyfooblah/voicecommon';
+import { useAuth } from '@andyfooblah/voice-common';
+import { ConnectionStatus } from '@andyfooblah/voice-common';
 import { useCarbotSession } from '../../hooks/useCarbotSession';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { tripContextLabel } from '../../services/sessions';

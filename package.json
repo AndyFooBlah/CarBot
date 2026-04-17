@@ -15,8 +15,8 @@
     "deploy:preview": "vite build && firebase hosting:channel:deploy preview"
   },
   "dependencies": {
-    "@andyfooblah/knowledgecommon": "file:../knowledgecommon",
-    "@andyfooblah/voicecommon": "file:../voicecommon",
+    "@andyfooblah/knowledge-common": "file:../knowledgecommon",
+    "@andyfooblah/voice-common": "file:../voicecommon",
     "@google/genai": "^1.41.0",
     "firebase": "^12.9.0",
     "pdfjs-dist": "^4.10.38",

@@ -17,7 +17,7 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import type { Message } from '@andyfooblah/voicecommon';
+import type { Message } from '@andyfooblah/voice-common';
 
 interface Props {
   messages: Message[];
