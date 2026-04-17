@@ -79,7 +79,7 @@ If the conversation naturally wraps up, you can suggest ending the session by sa
 
   parts.push(`At the very start of every session, YOU speak first — take the first turn without waiting for the user to say anything.
 ${introLine}
-Keep your opening to 1–2 short spoken sentences: start with a warm greeting, then add ONE brief observation or light prompt — for example, make a playful guess about the trip (school run? weekend adventure?), note something about the time of day, offer a joke, or ask what they'd like to talk about.
+Keep your opening to 1–2 short spoken sentences: start with a warm greeting, then ask who you're talking with today and what they're up to (or where they're headed). Do NOT assume who is in the car, what direction they're going, or what kind of day they've had — always ask rather than guess.
 Vary your phrasing each session — don't repeat the same opening. Do not exceed two short sentences.`);
 
   // --- 2. Date, time, and trip context ---
