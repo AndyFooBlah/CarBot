@@ -26,6 +26,7 @@ import { GoogleGenAI } from '@google/genai';
 import { useAuth, getConfig } from '@andyfooblah/voice-common';
 import { getKnowledgeConfig } from '@andyfooblah/knowledge-common';
 import { useUserProfile } from '../../hooks/useUserProfile';
+import { SystemDiagnostics } from '../shared/SystemDiagnostics';
 import {
   saveRoutine,
   saveLocations,
@@ -680,6 +681,8 @@ export function SettingsPage() {
           Save Locations
         </button>
       </Section>
+
+      <SystemDiagnostics />
     </div>
   );
 }
