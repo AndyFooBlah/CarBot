@@ -205,7 +205,10 @@ You're receiving this because session summaries are enabled in CarBot settings.
     const gmail = createGmailClient();
     const raw = makeEmailMessage(user.email, carbotEmailAddress.value(), subject, emailBody);
     await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
-    console.log(`[sessionSummaryEmail] Sent summary to ${user.email} for session ${sessionId}`);
+    // Mask the email in logs — enough to correlate when debugging, not
+    // enough to reconstruct the PII if logs get exported.
+    const masked = user.email.replace(/^(.).*@(.)[^.]*(\..+)$/, '$1***@$2***$3');
+    console.log(`[sessionSummaryEmail] Sent summary to ${masked} for session ${sessionId}`);
   } catch (err) {
     // Email failure is non-fatal — log and continue
     console.error('[sessionSummaryEmail] Failed to send email:', err);
