@@ -140,10 +140,24 @@ export async function extractMemoriesFromSession(sessionId: string): Promise<voi
     return;
   }
 
-  const transcriptText = transcriptToText(entries);
-  if (transcriptText.length < 50) {
+  const rawTranscriptText = transcriptToText(entries);
+  if (rawTranscriptText.length < 50) {
     console.log('[memoryExtraction] Transcript too short for extraction');
     return;
+  }
+
+  // M3: cap transcript at 100k chars before prompting. A normal hour-long
+  // session runs ~20-30k; past 100k the prompt is pathological (either a
+  // runaway session or a crafted payload) and keeping the last N chars
+  // preserves the most recent context rather than truncating it away.
+  const TRANSCRIPT_MAX = 100_000;
+  const transcriptText = rawTranscriptText.length > TRANSCRIPT_MAX
+    ? rawTranscriptText.slice(-TRANSCRIPT_MAX)
+    : rawTranscriptText;
+  if (rawTranscriptText.length > TRANSCRIPT_MAX) {
+    console.warn(
+      `[memoryExtraction] Transcript ${rawTranscriptText.length} chars exceeded ${TRANSCRIPT_MAX} cap; using last ${TRANSCRIPT_MAX} chars`,
+    );
   }
 
   // Call Gemini

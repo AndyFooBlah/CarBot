@@ -93,6 +93,17 @@ export const onSessionCompleted = onDocumentUpdated(
       return;
     }
 
+    // M2: skip very short sessions — no signal for memory extraction or
+    // summary email, and Gemini fan-out is pure cost. Raw transcript is
+    // still retained; cleanup / email just don't fire.
+    const durationSeconds = Number(after?.durationSeconds ?? 0);
+    if (durationSeconds < 60) {
+      console.log(
+        `[onSessionCompleted] Skipping session ${sessionId} — duration ${durationSeconds}s below 60s gate`,
+      );
+      return;
+    }
+
     console.log(`[onSessionCompleted] Processing session ${sessionId}`);
 
     // Run all three post-processing tasks in parallel.

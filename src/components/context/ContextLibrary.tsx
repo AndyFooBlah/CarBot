@@ -28,6 +28,7 @@ import {
   setContextDocumentActive,
   deleteContextDocument,
   extractTextFromPdf,
+  validateContextUpload,
   MAX_CONTENT_LENGTH,
 } from '../../services/contextDocuments';
 import type { ContextDocument } from '../../types';
@@ -124,6 +125,13 @@ export function ContextLibrary() {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    try {
+      validateContextUpload(file);
+    } catch (err) {
+      setError(String(err instanceof Error ? err.message : err));
+      e.target.value = '';
+      return;
+    }
     setAddFilename(file.name);
     if (!addTitle) setAddTitle(file.name.replace(/\.[^.]+$/, ''));
     setAddBusy(true);

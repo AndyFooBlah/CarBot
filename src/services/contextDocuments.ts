@@ -44,6 +44,43 @@ export const MAX_CONTENT_LENGTH = 50_000;
  */
 export const INSTRUCTION_INLINE_LIMIT = 2_000;
 
+/**
+ * M5: MIME + size allowlist for client-side uploads.
+ *
+ * The UI exposes a file picker restricted to .txt/.md/.pdf, but the type
+ * attribute is a hint only — a user can still select any file. These caps
+ * are enforced in `validateContextUpload()` before any content is read,
+ * so a crafted upload can't drive text extraction against a malformed or
+ * oversized payload. (Uploads don't hit Cloud Storage — they're text that
+ * goes straight into Firestore as a document string.)
+ */
+export const MAX_CONTEXT_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
+export const ALLOWED_CONTEXT_MIME_TYPES: readonly string[] = [
+  'text/plain',
+  'text/markdown',
+  'application/pdf',
+  // Some browsers report empty string for .md files; validateContextUpload
+  // falls back to the extension in that case.
+  '',
+];
+const ALLOWED_CONTEXT_EXTENSIONS: readonly string[] = ['.txt', '.md', '.pdf'];
+
+export function validateContextUpload(file: File): void {
+  if (file.size > MAX_CONTEXT_UPLOAD_BYTES) {
+    throw new Error(
+      `File is ${Math.round(file.size / 1024 / 1024)} MB; limit is ${MAX_CONTEXT_UPLOAD_BYTES / 1024 / 1024} MB.`,
+    );
+  }
+  const mimeOk = ALLOWED_CONTEXT_MIME_TYPES.includes(file.type);
+  const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0] ?? '';
+  const extOk = ALLOWED_CONTEXT_EXTENSIONS.includes(ext);
+  if (!mimeOk && !extOk) {
+    throw new Error(
+      `Unsupported file type. Accepted: .txt, .md, .pdf (got "${file.name}").`,
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Read
 // ---------------------------------------------------------------------------

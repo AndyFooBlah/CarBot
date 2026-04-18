@@ -88,10 +88,22 @@ export async function generateCleanTranscript(
   }
 
   // Build prompt with child's name substituted
-  const transcriptText = entries
+  const rawTranscriptText = entries
     .filter((e) => e.role !== 'tool')
     .map((e, i) => `{"role":"${e.role}","text":"${e.text.replace(/"/g, '\\"')}","messageIndex":${i}}`)
     .join('\n');
+
+  // M3: cap transcript at 100k chars. Past that the prompt is pathological
+  // and Gemini's output cap (8192 tokens) can't round-trip it anyway.
+  const TRANSCRIPT_MAX = 100_000;
+  const transcriptText = rawTranscriptText.length > TRANSCRIPT_MAX
+    ? rawTranscriptText.slice(-TRANSCRIPT_MAX)
+    : rawTranscriptText;
+  if (rawTranscriptText.length > TRANSCRIPT_MAX) {
+    console.warn(
+      `[cleanTranscript] Transcript ${rawTranscriptText.length} chars exceeded ${TRANSCRIPT_MAX} cap; using last ${TRANSCRIPT_MAX} chars`,
+    );
+  }
 
   const prompt = CLEAN_TRANSCRIPT_PROMPT.replace('CHILD_PLACEHOLDER', resolvedChildName) + transcriptText;
 
