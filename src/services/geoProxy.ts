@@ -45,12 +45,30 @@ async function callGeoProxy(data: GeoProxyInput): Promise<GeoProxyResult> {
   return res.data;
 }
 
+/**
+ * Translate a Firebase callable error into a message the Gemini Live model
+ * can interpret and relay to the user. The httpsCallable wrapper surfaces a
+ * server-thrown HttpsError as a FunctionsError with `code` prefixed by
+ * `functions/` (e.g. `functions/resource-exhausted`).
+ *
+ * Rate-limit errors get a specific, retryable message so the model can say
+ * "we've hit our daily limit" instead of silently degrading.
+ */
+function toolErrorMessage(err: unknown, fallback: string): string {
+  const code = (err as { code?: string })?.code;
+  if (code === 'functions/resource-exhausted') {
+    const msg = (err as { message?: string })?.message ?? '';
+    return `Rate limit reached: ${msg} The user should be told we've used this service too many times today and can try again tomorrow.`;
+  }
+  return fallback;
+}
+
 export async function proxySearchPlace(query: string): Promise<string> {
   try {
     return (await callGeoProxy({ type: 'geocode', query })).result;
   } catch (err) {
     console.warn('[geoProxy] searchPlace error:', err);
-    return 'Maps search unavailable at this time.';
+    return toolErrorMessage(err, 'Maps search unavailable at this time.');
   }
 }
 
@@ -59,7 +77,7 @@ export async function proxyGetDistanceBetweenPlaces(from: string, to: string): P
     return (await callGeoProxy({ type: 'distance', query: from, queryB: to })).result;
   } catch (err) {
     console.warn('[geoProxy] getDistanceBetweenPlaces error:', err);
-    return 'Distance lookup unavailable at this time.';
+    return toolErrorMessage(err, 'Distance lookup unavailable at this time.');
   }
 }
 
@@ -68,7 +86,7 @@ export async function proxyGetWeather(location: string): Promise<string> {
     return (await callGeoProxy({ type: 'weather', query: location })).result;
   } catch (err) {
     console.warn('[geoProxy] getWeather error:', err);
-    return 'Weather lookup unavailable at this time.';
+    return toolErrorMessage(err, 'Weather lookup unavailable at this time.');
   }
 }
 
