@@ -149,7 +149,7 @@ export async function extractMemoriesFromSession(sessionId: string): Promise<voi
   // Call Gemini
   const apiKey = geminiApiKey.value();
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -175,7 +175,7 @@ export async function extractMemoriesFromSession(sessionId: string): Promise<voi
   // Session-level memories (source of truth)
   batch.set(
     db.collection('sessions').doc(sessionId).collection('memories').doc('facts'),
-    { facts, extractedAt: now, model: 'gemini-2.0-flash' },
+    { facts, extractedAt: now, model: 'gemini-2.5-flash' },
   );
 
   // Fan out to cross-session index

@@ -327,7 +327,7 @@ export function SessionDetail() {
               controls
               src={session.audioUrl}
               className="w-full rounded-lg"
-              preload="none"
+              preload="metadata"
             />
           </div>
         )}
