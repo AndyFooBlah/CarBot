@@ -26,6 +26,7 @@ import './index.css';
 import App from './App';
 import { initializeVoiceCommon, db } from '@andyfooblah/voice-common';
 import { initializeKnowledgeCommon } from '@andyfooblah/knowledge-common';
+import { proxyGetWeather, proxySearchPlace, proxyGetDistanceBetweenPlaces } from './services/geoProxy';
 
 initializeVoiceCommon({
   firebase: {
@@ -41,8 +42,13 @@ initializeVoiceCommon({
 
 initializeKnowledgeCommon({
   geminiApiKey: import.meta.env.VITE_GEMINI_API_KEY,
-  mapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
   firestore: db,
+  // Maps and Weather APIs don't allow browser CORS; route through geoProxy Cloud Function.
+  toolOverrides: {
+    getWeather: proxyGetWeather,
+    searchPlace: proxySearchPlace,
+    getDistanceBetweenPlaces: proxyGetDistanceBetweenPlaces,
+  },
 });
 
 const rootElement = document.getElementById('root');

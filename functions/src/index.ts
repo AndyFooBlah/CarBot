@@ -47,6 +47,8 @@ import {
   carbotWebUrl,
 } from './sessionSummaryEmail';
 
+export { geoProxy } from './geoProxy';
+
 initializeApp();
 
 /**
