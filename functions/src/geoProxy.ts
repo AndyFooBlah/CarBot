@@ -116,11 +116,20 @@ export const geoProxy = onCall(
       if (typeof lat !== 'number' || typeof lng !== 'number') {
         throw new HttpsError('invalid-argument', 'lat and lng required for reverseGeocodeCity.');
       }
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        throw new HttpsError('invalid-argument', 'lat/lng out of range.');
+      }
       const city = await reverseGeocodeCity(lat, lng, key);
       return { city, result: city ?? '' };
     }
 
     if (!query) throw new HttpsError('invalid-argument', 'query is required.');
+    if (typeof query !== 'string' || query.length > 500) {
+      throw new HttpsError('invalid-argument', 'query is too long.');
+    }
+    if (queryB !== undefined && (typeof queryB !== 'string' || queryB.length > 500)) {
+      throw new HttpsError('invalid-argument', 'queryB is too long.');
+    }
 
     // --- Geocode ---
     if (type === 'geocode') {
