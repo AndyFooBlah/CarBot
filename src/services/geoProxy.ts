@@ -118,3 +118,27 @@ export async function proxyReverseGeocodeCity(lat: number, lng: number): Promise
     return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Wikipedia cache filler (SECURITY_REVIEW H2)
+//
+// Client writes to `wikipedia_cache` are denied by Firestore rules to prevent
+// cache-poisoning. Cache fills go through this server-side callable.
+// ---------------------------------------------------------------------------
+
+interface CacheWikipediaResult {
+  chunkCount: number;
+  cached: boolean;
+}
+
+export async function proxyCacheWikipediaArticle(
+  articleId: string,
+  title: string,
+): Promise<{ chunkCount: number }> {
+  const fn = httpsCallable<
+    { articleId: string; title: string },
+    CacheWikipediaResult
+  >(functions, 'cacheWikipediaArticle');
+  const res = await fn({ articleId, title });
+  return { chunkCount: res.data.chunkCount };
+}

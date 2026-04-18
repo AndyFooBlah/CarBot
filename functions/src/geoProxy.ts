@@ -29,6 +29,7 @@
 
 import { onCall, CallableRequest, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
+import { enforceRateLimit } from './rateLimit';
 
 export const googleMapsApiKey = defineSecret('GOOGLE_MAPS_API_KEY');
 
@@ -97,6 +98,7 @@ export const geoProxy = onCall(
   },
   async (request: CallableRequest) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication required.');
+    await enforceRateLimit(request.auth.uid, 'geoProxy');
 
     const key = googleMapsApiKey.value();
     if (!key) throw new HttpsError('internal', 'GOOGLE_MAPS_API_KEY not configured on server.');

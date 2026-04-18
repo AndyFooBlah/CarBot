@@ -26,7 +26,7 @@ import './index.css';
 import App from './App';
 import { initializeVoiceCommon, db } from '@andyfooblah/voice-common';
 import { initializeKnowledgeCommon } from '@andyfooblah/knowledge-common';
-import { proxyGetWeather, proxySearchPlace, proxyGetDistanceBetweenPlaces } from './services/geoProxy';
+import { proxyGetWeather, proxySearchPlace, proxyGetDistanceBetweenPlaces, proxyCacheWikipediaArticle } from './services/geoProxy';
 
 initializeVoiceCommon({
   firebase: {
@@ -49,6 +49,7 @@ initializeKnowledgeCommon({
     searchPlace: proxySearchPlace,
     getDistanceBetweenPlaces: proxyGetDistanceBetweenPlaces,
   },
+  cacheWikipediaArticle: proxyCacheWikipediaArticle,
 });
 
 const rootElement = document.getElementById('root');

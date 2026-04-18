@@ -142,11 +142,17 @@ service cloud.firestore {
     // Wikipedia article cache (shared across all users, not user-scoped)
     // ---------------------------------------------------------------------------
 
+    // Reads are open (public Wikipedia content, shared cache). Writes are
+    // denied here and happen only through the `cacheWikipediaArticle`
+    // Cloud Function which fetches server-side before writing. Prevents
+    // cache-poisoning (SECURITY_REVIEW H2).
     match /wikipedia_cache/{articleId} {
-      allow read, write: if isAuth();
+      allow read: if isAuth();
+      allow write: if false;
 
       match /chunks/{chunkIndex} {
-        allow read, write: if isAuth();
+        allow read: if isAuth();
+        allow write: if false;
       }
     }
 

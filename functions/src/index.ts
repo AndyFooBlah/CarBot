@@ -48,6 +48,7 @@ import {
 } from './sessionSummaryEmail';
 
 export { geoProxy } from './geoProxy';
+export { cacheWikipediaArticle } from './cacheWikipedia';
 export {
   dailyDataCleanup,
   cleanTranscriptForSession,
