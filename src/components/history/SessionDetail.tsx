@@ -20,10 +20,11 @@
  * full version history.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getSession, useAuth } from '@andyfooblah/voice-common';
+import { getSession, useAuth, functions } from '@andyfooblah/voice-common';
 import type { TranscriptEntry } from '@andyfooblah/voice-common';
+import { httpsCallable } from 'firebase/functions';
 import { getSessionMemories } from '../../services/memories';
 import {
   getRawTranscript,
@@ -71,10 +72,12 @@ function TranscriptView({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [cleanInfo, setCleanInfo] = useState<{ generatedAt: Date; model: string } | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
+  const [regenError, setRegenError] = useState('');
 
-  useEffect(() => {
+  const loadTranscript = useCallback(async () => {
     setLoading(true);
-    const load = async () => {
+    try {
       if (type === 'entries') {
         const raw = await getRawTranscript(sessionId);
         setEntries(raw);
@@ -87,13 +90,27 @@ function TranscriptView({
       }
       const hist = await getTranscriptHistory(sessionId, type);
       setHistory(hist);
-      // If there are edits, show the most recent
-      if (hist.length > 0) {
-        setEntries(hist[0].entries);
-      }
-    };
-    load().catch(console.error).finally(() => setLoading(false));
+      if (hist.length > 0) setEntries(hist[0].entries);
+    } finally {
+      setLoading(false);
+    }
   }, [sessionId, type]);
+
+  useEffect(() => { loadTranscript().catch(console.error); }, [loadTranscript]);
+
+  const regenerateClean = async () => {
+    setRegenerating(true);
+    setRegenError('');
+    try {
+      const fn = httpsCallable<{ sessionId: string }, { success: boolean }>(functions, 'cleanTranscriptForSession');
+      await fn({ sessionId });
+      await loadTranscript();
+    } catch (err) {
+      setRegenError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRegenerating(false);
+    }
+  };
 
   const startEdit = () => {
     setEditedEntries(entries.map((e) => ({ ...e })));
@@ -127,8 +144,20 @@ function TranscriptView({
 
   if (entries.length === 0) {
     return (
-      <div className="text-center py-8 text-slate-400 text-sm">
-        {type === 'clean' ? 'Clean transcript not yet generated.' : 'No transcript available.'}
+      <div className="text-center py-8 text-slate-400 text-sm space-y-3">
+        <p>{type === 'clean' ? 'Clean transcript not yet generated.' : 'No transcript available.'}</p>
+        {type === 'clean' && (
+          <div className="space-y-1">
+            <button
+              onClick={regenerateClean}
+              disabled={regenerating}
+              className="px-4 py-2 text-sm rounded-xl bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-wait"
+            >
+              {regenerating ? 'Generating…' : 'Generate now'}
+            </button>
+            {regenError && <p className="text-xs text-red-500">{regenError}</p>}
+          </div>
+        )}
       </div>
     );
   }
@@ -148,8 +177,21 @@ function TranscriptView({
               Generated {cleanInfo.generatedAt.toLocaleDateString()}
             </span>
           )}
+          {type === 'clean' && regenError && (
+            <span className="text-xs text-red-500">{regenError}</span>
+          )}
         </div>
         <div className="flex items-center gap-2">
+          {type === 'clean' && !editing && (
+            <button
+              onClick={regenerateClean}
+              disabled={regenerating}
+              className="text-xs text-slate-500 hover:text-slate-800 disabled:opacity-50 disabled:cursor-wait"
+              title="Regenerate clean transcript using AI"
+            >
+              {regenerating ? 'Regenerating…' : 'Regenerate'}
+            </button>
+          )}
           <button
             onClick={() => setShowHistory(!showHistory)}
             className="text-xs text-slate-500 hover:text-slate-800"
