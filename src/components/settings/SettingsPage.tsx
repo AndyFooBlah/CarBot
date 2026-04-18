@@ -23,7 +23,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
-import { useAuth, getConfig } from '@andyfooblah/voice-common';
+import { useAuth, getGeminiApiKey } from '@andyfooblah/voice-common';
 import { proxyResolveAddress } from '../../services/geoProxy';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { previewVoice } from '../../services/voicePreview';
@@ -217,7 +217,7 @@ function AddActivityForm({
     setParsing(true);
     setParseError('');
     try {
-      const apiKey = getConfig().geminiApiKey;
+      const apiKey = getGeminiApiKey();
       if (!apiKey) throw new Error('No Gemini API key configured');
       const occurrences = await parseScheduleWithGemini(name.trim(), description.trim(), apiKey);
       if (occurrences.length === 0) {
@@ -529,7 +529,7 @@ export function SettingsPage() {
               onClick={async () => {
                 setVoicePreviewState('loading');
                 try {
-                  const apiKey = getConfig().geminiApiKey;
+                  const apiKey = getGeminiApiKey();
                   if (!apiKey) throw new Error('No Gemini API key configured');
                   await previewVoice(selectedVoice, botName.trim() || 'CarBot', apiKey);
                   setVoicePreviewState('idle');
