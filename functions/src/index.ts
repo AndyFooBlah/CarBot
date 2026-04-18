@@ -49,6 +49,7 @@ import {
 
 export { geoProxy } from './geoProxy';
 export { dailyDataCleanup, cleanTranscriptForSession } from './dataCleanup';
+export { checkAndReserveVoiceQuota, recordVoiceUsage } from './voiceQuota';
 
 initializeApp();
 

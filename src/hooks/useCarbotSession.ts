@@ -41,7 +41,16 @@ import { getActiveContextDocuments } from '../services/contextDocuments';
 import { buildCarbotInstruction, getCurrentCity, computeTripContext } from '../services/instructionBuilder';
 import { setSessionCarbotFields } from '../services/sessions';
 import { markBotNameIntroduced } from '../services/userProfile';
+import { checkAndReserveVoiceQuota, recordVoiceUsage } from '../services/voiceQuota';
 import type { CarbotUserProfile, TripContext } from '../types';
+
+/**
+ * Maximum duration a single session is allowed to run before the client
+ * auto-ends it. Guards against tabs left open indefinitely. Set high enough
+ * that a legitimate long conversation with an elderly family member is not
+ * interrupted.
+ */
+const MAX_SESSION_DURATION_MS = 4 * 60 * 60 * 1000; // 4 hours
 
 export interface UseCarbotSessionOptions {
   userId: string;
@@ -52,6 +61,11 @@ export interface UseCarbotSessionOptions {
 
 export interface UseCarbotSessionReturn extends UseSessionReturn {
   tripContext: TripContext;
+  /**
+   * Human-readable quota error message when startSession was blocked by the
+   * per-day voice quota. Cleared automatically on the next startSession call.
+   */
+  quotaError: string | null;
 }
 
 export function useCarbotSession(options: UseCarbotSessionOptions): UseCarbotSessionReturn {
@@ -60,11 +74,16 @@ export function useCarbotSession(options: UseCarbotSessionOptions): UseCarbotSes
   // The assembled system instruction — built once per session start
   const [systemInstruction, setSystemInstruction] = useState('');
   const [tripContext, setTripContext] = useState<TripContext>('unstructured');
+  const [quotaError, setQuotaError] = useState<string | null>(null);
 
   // Track the context doc IDs that were active at session start for storage
   const activeDocIdsRef = useRef<string[]>([]);
   // Whether the CarBot fields have been written to Firestore for this session
   const carbotFieldsWrittenRef = useRef(false);
+  // When the current session started — used to compute duration at stop time
+  const sessionStartAtRef = useRef<number | null>(null);
+  // Timer that auto-ends the session if it runs past MAX_SESSION_DURATION_MS
+  const maxDurationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const vcSession = useSession({
     userId,
@@ -111,6 +130,23 @@ export function useCarbotSession(options: UseCarbotSessionOptions): UseCarbotSes
 
   // Wrap startSession to build the instruction first
   const startSession = useCallback(async () => {
+    setQuotaError(null);
+
+    // Reserve a session slot before doing any expensive work. If the daily
+    // quota is exhausted this short-circuits cleanly without opening a
+    // Gemini connection.
+    try {
+      const quota = await checkAndReserveVoiceQuota();
+      if (!quota.allowed) {
+        setQuotaError(quota.reason ?? 'Voice session unavailable at this time.');
+        return;
+      }
+    } catch (err) {
+      console.error('[useCarbotSession] Voice quota check failed:', err);
+      setQuotaError('Could not verify voice quota. Please try again.');
+      return;
+    }
+
     carbotFieldsWrittenRef.current = false;
     const now = new Date();
     const context = computeTripContext(profile, now);
@@ -138,7 +174,17 @@ export function useCarbotSession(options: UseCarbotSessionOptions): UseCarbotSes
     // Pass the instruction directly to avoid the stale-closure problem:
     // setSystemInstruction schedules a re-render; vcSession.startSession()
     // would otherwise run before that render and see the old (empty) value.
+    sessionStartAtRef.current = Date.now();
     await vcSession.startSession(instruction);
+
+    // Arm the hard-timeout watchdog — see MAX_SESSION_DURATION_MS.
+    if (maxDurationTimerRef.current) clearTimeout(maxDurationTimerRef.current);
+    maxDurationTimerRef.current = setTimeout(() => {
+      console.warn('[useCarbotSession] Session exceeded max duration — auto-ending');
+      vcSession.stopSession().catch((err) =>
+        console.error('[useCarbotSession] Auto-stop failed:', err),
+      );
+    }, MAX_SESSION_DURATION_MS);
 
     // Session connected — if the bot introduced itself with its name, clear
     // the flag so it doesn't repeat the introduction next session.
@@ -149,9 +195,37 @@ export function useCarbotSession(options: UseCarbotSessionOptions): UseCarbotSes
     }
   }, [userId, profile, vcSession]);
 
+  // Wrap stopSession to record usage and clear the hard-timeout watchdog.
+  const stopSession = useCallback(async () => {
+    if (maxDurationTimerRef.current) {
+      clearTimeout(maxDurationTimerRef.current);
+      maxDurationTimerRef.current = null;
+    }
+    const startedAt = sessionStartAtRef.current;
+    sessionStartAtRef.current = null;
+
+    try {
+      await vcSession.stopSession();
+    } finally {
+      if (startedAt) {
+        const durationSeconds = Math.max(0, Math.round((Date.now() - startedAt) / 1000));
+        recordVoiceUsage(durationSeconds).catch(() => null);
+      }
+    }
+  }, [vcSession]);
+
+  // Clean up the watchdog if the component unmounts mid-session.
+  useEffect(() => {
+    return () => {
+      if (maxDurationTimerRef.current) clearTimeout(maxDurationTimerRef.current);
+    };
+  }, []);
+
   return {
     ...vcSession,
     startSession,
+    stopSession,
     tripContext,
+    quotaError,
   };
 }

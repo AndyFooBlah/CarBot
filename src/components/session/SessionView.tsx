@@ -53,6 +53,7 @@ export function SessionView() {
     sessionId,
     error,
     tripContext,
+    quotaError,
   } = useCarbotSession({
     userId: user?.uid ?? '',
     profile: profile ?? {
@@ -104,6 +105,13 @@ export function SessionView() {
       {error && (
         <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
           {error}
+        </div>
+      )}
+
+      {/* Quota error (daily limit reached) */}
+      {quotaError && !isRecording && (
+        <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+          {quotaError}
         </div>
       )}
 
