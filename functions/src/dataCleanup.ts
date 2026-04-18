@@ -61,10 +61,16 @@ export const dailyDataCleanup = onSchedule(
       repairMissedTranscripts(db),
       repairMissedMemories(db),
       cleanStaleActiveSessions(db),
+      cleanWikipediaCache(db),
     ]);
 
     for (const [i, result] of results.entries()) {
-      const names = ['repairMissedTranscripts', 'repairMissedMemories', 'cleanStaleActiveSessions'];
+      const names = [
+        'repairMissedTranscripts',
+        'repairMissedMemories',
+        'cleanStaleActiveSessions',
+        'cleanWikipediaCache',
+      ];
       if (result.status === 'rejected') {
         console.error(`[dailyDataCleanup] ${names[i]} failed:`, result.reason);
       }
@@ -250,6 +256,36 @@ async function repairMissedMemories(db: ReturnType<typeof getFirestore>): Promis
   }
 
   console.log(`[repairMissedMemories] Repaired ${repaired}, skipped ${skipped}`);
+}
+
+/**
+ * M6: Delete `wikipedia_cache/{articleId}` docs older than 30 days,
+ * including their `chunks` subcollection. The cache is a global resource
+ * shared by all users, so it would otherwise grow without bound.
+ */
+async function cleanWikipediaCache(db: ReturnType<typeof getFirestore>): Promise<void> {
+  const cutoff = Timestamp.fromMillis(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const snap = await db
+    .collection('wikipedia_cache')
+    .where('fetchedAt', '<', cutoff)
+    .limit(200)
+    .get();
+
+  if (snap.empty) {
+    console.log('[cleanWikipediaCache] Nothing to clean');
+    return;
+  }
+
+  let deleted = 0;
+  for (const articleDoc of snap.docs) {
+    const chunks = await articleDoc.ref.collection('chunks').get();
+    const batch = db.batch();
+    chunks.docs.forEach((c) => batch.delete(c.ref));
+    batch.delete(articleDoc.ref);
+    await batch.commit();
+    deleted++;
+  }
+  console.log(`[cleanWikipediaCache] Deleted ${deleted} stale article(s)`);
 }
 
 /**
