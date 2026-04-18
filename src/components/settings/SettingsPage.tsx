@@ -27,6 +27,7 @@ import { useAuth, getConfig } from '@andyfooblah/voice-common';
 import { getKnowledgeConfig } from '@andyfooblah/knowledge-common';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { SystemDiagnostics } from '../shared/SystemDiagnostics';
+import { previewVoice } from '../../services/voicePreview';
 import {
   saveRoutine,
   saveLocations,
@@ -395,6 +396,7 @@ export function SettingsPage() {
   const [childName, setChildName] = useState('');
   const [botName, setBotName] = useState('');
   const [selectedVoice, setSelectedVoice] = useState('Puck');
+  const [voicePreviewState, setVoicePreviewState] = useState<'idle' | 'loading' | 'error'>('idle');
   const [emailSummaries, setEmailSummaries] = useState(true);
 
   // Routine fields
@@ -535,20 +537,46 @@ export function SettingsPage() {
           />
         </Field>
         <Field label="Bot voice" hint="The Gemini Live voice used for speech. Takes effect on the next session.">
-          <select
-            value={selectedVoice}
-            onChange={(e) => setSelectedVoice(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-          >
-            <option value="Puck">Puck (default)</option>
-            <option value="Aoede">Aoede</option>
-            <option value="Charon">Charon</option>
-            <option value="Fenrir">Fenrir</option>
-            <option value="Kore">Kore</option>
-            <option value="Leda">Leda</option>
-            <option value="Orus">Orus</option>
-            <option value="Zephyr">Zephyr</option>
-          </select>
+          <div className="flex gap-2 items-center">
+            <select
+              value={selectedVoice}
+              onChange={(e) => { setSelectedVoice(e.target.value); setVoicePreviewState('idle'); }}
+              className="flex-1 px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              <option value="Puck">Puck (default)</option>
+              <option value="Aoede">Aoede</option>
+              <option value="Charon">Charon</option>
+              <option value="Fenrir">Fenrir</option>
+              <option value="Kore">Kore</option>
+              <option value="Leda">Leda</option>
+              <option value="Orus">Orus</option>
+              <option value="Zephyr">Zephyr</option>
+            </select>
+            <button
+              disabled={voicePreviewState === 'loading'}
+              onClick={async () => {
+                setVoicePreviewState('loading');
+                try {
+                  const apiKey = getConfig().geminiApiKey;
+                  if (!apiKey) throw new Error('No Gemini API key configured');
+                  await previewVoice(selectedVoice, botName.trim() || 'CarBot', apiKey);
+                  setVoicePreviewState('idle');
+                } catch {
+                  setVoicePreviewState('error');
+                  setTimeout(() => setVoicePreviewState('idle'), 3000);
+                }
+              }}
+              className={`shrink-0 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                voicePreviewState === 'loading'
+                  ? 'bg-slate-100 text-slate-400 cursor-wait'
+                  : voicePreviewState === 'error'
+                    ? 'bg-red-50 text-red-500 border border-red-200'
+                    : 'bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100'
+              }`}
+            >
+              {voicePreviewState === 'loading' ? '…' : voicePreviewState === 'error' ? 'failed' : 'Say hi'}
+            </button>
+          </div>
         </Field>
         <Field label="Child's name" hint="Used in transcript speaker labels and system instruction">
           <input
