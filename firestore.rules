@@ -159,5 +159,18 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ---------------------------------------------------------------------------
+    // Per-user voice quota counters (internal — Cloud Functions only)
+    // ---------------------------------------------------------------------------
+    //
+    // Written exclusively by the voiceQuota callables via the admin SDK. Clients
+    // must never read or write these — exposing them would let a user see or
+    // reset their own daily cap. Firestore's default-deny would already block
+    // access (no other rule matches `_usage/...`), but we set it explicitly so
+    // the intent is visible in the rules file.
+    match /_usage/{uid}/{document=**} {
+      allow read, write: if false;
+    }
+
   }
 }
