@@ -24,7 +24,7 @@
 import React, { useState, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { useAuth, getConfig } from '@andyfooblah/voice-common';
-import { getKnowledgeConfig } from '@andyfooblah/knowledge-common';
+import { proxyResolveAddress } from '../../services/geoProxy';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { SystemDiagnostics } from '../shared/SystemDiagnostics';
 import { previewVoice } from '../../services/voicePreview';
@@ -93,32 +93,6 @@ Return only valid JSON array, nothing else.`;
   const parsed = JSON.parse(cleaned) as ParsedOccurrence[];
   if (!Array.isArray(parsed)) throw new Error('Expected JSON array from Gemini');
   return parsed;
-}
-
-// ---------------------------------------------------------------------------
-// Maps geocoding helper
-// ---------------------------------------------------------------------------
-
-/**
- * Forward-geocode a place query to a full formatted address using the
- * Google Maps Geocoding API. Returns the query unchanged if no Maps API
- * key is configured or if the lookup fails.
- */
-async function resolveAddress(query: string, mapsApiKey: string | null | undefined): Promise<string> {
-  if (!mapsApiKey) return query;
-  try {
-    const encoded = encodeURIComponent(query);
-    const res = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?address=${encoded}&key=${mapsApiKey}`,
-    );
-    const data = await res.json();
-    if (data.status === 'OK' && data.results?.length > 0) {
-      return data.results[0].formatted_address as string;
-    }
-  } catch {
-    // Fall through and return the raw query
-  }
-  return query;
 }
 
 // ---------------------------------------------------------------------------
@@ -326,8 +300,7 @@ function AddLocationForm({
     setResolving(true);
     setResolveError('');
     try {
-      const mapsApiKey = getKnowledgeConfig().mapsApiKey;
-      const resolvedAddress = await resolveAddress(query.trim(), mapsApiKey);
+      const resolvedAddress = await proxyResolveAddress(query.trim());
       onAdd({ name: name.trim().toLowerCase(), query: query.trim(), resolvedAddress });
     } catch (err) {
       setResolveError(`Failed: ${String(err)}`);

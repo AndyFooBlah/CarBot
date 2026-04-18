@@ -232,23 +232,13 @@ describe('computeTripContext', () => {
 // ---------------------------------------------------------------------------
 
 describe('getCurrentCity', () => {
-  it('returns null when mapsApiKey is null', async () => {
-    const result = await getCurrentCity(null);
-    expect(result).toBeNull();
-  });
-
-  it('returns null when mapsApiKey is undefined', async () => {
-    const result = await getCurrentCity(undefined);
-    expect(result).toBeNull();
-  });
-
   it('returns null when geolocation is not available', async () => {
     // jsdom doesn't have navigator.geolocation by default
     Object.defineProperty(window.navigator, 'geolocation', {
       value: undefined,
       configurable: true,
     });
-    const result = await getCurrentCity('fake-api-key');
+    const result = await getCurrentCity();
     expect(result).toBeNull();
   });
 });

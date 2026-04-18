@@ -31,7 +31,6 @@ import { useSession } from '@andyfooblah/voice-common';
 import type { UseSessionReturn } from '@andyfooblah/voice-common';
 import {
   allKnowledgeTools,
-  getKnowledgeConfig,
   getWeather,
   searchPlace,
   getDistanceBetweenPlaces,
@@ -122,8 +121,7 @@ export function useCarbotSession(options: UseCarbotSessionOptions): UseCarbotSes
     activeDocIdsRef.current = activeDocs.map((d) => d.id);
 
     // Try to get current city (non-fatal)
-    const mapsApiKey = getKnowledgeConfig().mapsApiKey ?? null;
-    const currentCity = await getCurrentCity(mapsApiKey);
+    const currentCity = await getCurrentCity();
 
     // Assemble the system instruction
     const instruction = await buildCarbotInstruction({

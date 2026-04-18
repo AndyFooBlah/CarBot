@@ -31,6 +31,7 @@ import { getMemoryContextString } from './memories';
 import { getActiveContextDocuments, buildContextDocumentSection } from './contextDocuments';
 import { inferTripContext, tripContextToDescription, getDayScheduleSummary } from './tripContext';
 import { getRecentSessionTimestamps } from './sessions';
+import { proxyReverseGeocodeCity } from './geoProxy';
 import type { CarbotUserProfile, TripContext } from '../types';
 
 export interface SessionContext {
@@ -162,20 +163,16 @@ Vary your phrasing each session — don't repeat the same opening. Do not exceed
 /**
  * Attempt to get the user's current city via browser geolocation.
  *
- * Uses the Google Maps Geocoding API to reverse-geocode to city level.
- * Returns null if:
+ * Uses the geoProxy callable (server-side Google Maps) to reverse-geocode
+ * to city level. Returns null if:
  *   - Geolocation permission is denied
  *   - Geolocation times out (3 seconds)
- *   - No Maps API key is configured
- *   - The geocoding request fails
+ *   - The proxy request fails or finds no locality
  *
+ * Coordinates are sent only to the server-side proxy, never to Google directly.
  * The result is ONLY used for in-session context and is never stored.
- *
- * @param mapsApiKey - Google Maps API key. Pass null to skip geolocation.
  */
-export async function getCurrentCity(mapsApiKey: string | null | undefined): Promise<string | null> {
-  if (!mapsApiKey) return null;
-
+export async function getCurrentCity(): Promise<string | null> {
   try {
     const position = await new Promise<GeolocationPosition>((resolve, reject) => {
       if (!navigator.geolocation) {
@@ -190,23 +187,11 @@ export async function getCurrentCity(mapsApiKey: string | null | undefined): Pro
     });
 
     const { latitude, longitude } = position.coords;
-    const res = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&result_type=locality&key=${mapsApiKey}`,
-    );
-    const data = await res.json();
-
-    if (data.status === 'OK' && data.results?.length > 0) {
-      // Return only the city component — never the street address
-      const cityComponent = data.results[0].address_components?.find(
-        (c: { types: string[] }) => c.types.includes('locality'),
-      );
-      return cityComponent?.long_name ?? null;
-    }
+    return await proxyReverseGeocodeCity(latitude, longitude);
   } catch {
     // Geolocation denied or timed out — silently fall back to null
+    return null;
   }
-
-  return null;
 }
 
 /**

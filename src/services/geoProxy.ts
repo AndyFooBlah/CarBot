@@ -29,19 +29,25 @@ import { functions } from '@andyfooblah/voice-common';
 
 interface GeoProxyResult {
   result: string;
+  formattedAddress?: string;
+  city?: string | null;
+  lat?: number;
+  lng?: number;
 }
 
-async function callGeoProxy(
-  data: { type: 'geocode' | 'distance' | 'weather'; query: string; queryB?: string },
-): Promise<string> {
-  const fn = httpsCallable<typeof data, GeoProxyResult>(functions, 'geoProxy');
+type GeoProxyInput =
+  | { type: 'geocode' | 'distance' | 'weather'; query: string; queryB?: string }
+  | { type: 'reverseGeocodeCity'; lat: number; lng: number };
+
+async function callGeoProxy(data: GeoProxyInput): Promise<GeoProxyResult> {
+  const fn = httpsCallable<GeoProxyInput, GeoProxyResult>(functions, 'geoProxy');
   const res = await fn(data);
-  return res.data.result;
+  return res.data;
 }
 
 export async function proxySearchPlace(query: string): Promise<string> {
   try {
-    return await callGeoProxy({ type: 'geocode', query });
+    return (await callGeoProxy({ type: 'geocode', query })).result;
   } catch (err) {
     console.warn('[geoProxy] searchPlace error:', err);
     return 'Maps search unavailable at this time.';
@@ -50,7 +56,7 @@ export async function proxySearchPlace(query: string): Promise<string> {
 
 export async function proxyGetDistanceBetweenPlaces(from: string, to: string): Promise<string> {
   try {
-    return await callGeoProxy({ type: 'distance', query: from, queryB: to });
+    return (await callGeoProxy({ type: 'distance', query: from, queryB: to })).result;
   } catch (err) {
     console.warn('[geoProxy] getDistanceBetweenPlaces error:', err);
     return 'Distance lookup unavailable at this time.';
@@ -59,9 +65,38 @@ export async function proxyGetDistanceBetweenPlaces(from: string, to: string): P
 
 export async function proxyGetWeather(location: string): Promise<string> {
   try {
-    return await callGeoProxy({ type: 'weather', query: location });
+    return (await callGeoProxy({ type: 'weather', query: location })).result;
   } catch (err) {
     console.warn('[geoProxy] getWeather error:', err);
     return 'Weather lookup unavailable at this time.';
+  }
+}
+
+/**
+ * Forward-geocode a user-entered location name to a formatted address.
+ * Returns the raw query unchanged if the proxy call fails or finds nothing.
+ */
+export async function proxyResolveAddress(query: string): Promise<string> {
+  try {
+    const res = await callGeoProxy({ type: 'geocode', query });
+    return res.formattedAddress ?? query;
+  } catch (err) {
+    console.warn('[geoProxy] resolveAddress error:', err);
+    return query;
+  }
+}
+
+/**
+ * Reverse-geocode a lat/lng pair to a city name (locality). Returns null if
+ * the proxy call fails or no locality is found. Coordinates are sent only
+ * to the server-side proxy, never directly to Google.
+ */
+export async function proxyReverseGeocodeCity(lat: number, lng: number): Promise<string | null> {
+  try {
+    const res = await callGeoProxy({ type: 'reverseGeocodeCity', lat, lng });
+    return res.city ?? null;
+  } catch (err) {
+    console.warn('[geoProxy] reverseGeocodeCity error:', err);
+    return null;
   }
 }

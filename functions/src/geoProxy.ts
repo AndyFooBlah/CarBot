@@ -60,6 +60,21 @@ async function geocodeServer(query: string, key: string): Promise<GeoResult | nu
   };
 }
 
+async function reverseGeocodeCity(lat: number, lng: number, key: string): Promise<string | null> {
+  const url =
+    `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}` +
+    `&result_type=locality&key=${key}`;
+  const resp = await fetch(url);
+  if (!resp.ok) return null;
+  const data = await resp.json() as Record<string, unknown>;
+  if (data['status'] !== 'OK') return null;
+  const results = data['results'] as Array<Record<string, unknown>>;
+  if (!results?.length) return null;
+  const components = results[0]['address_components'] as Array<{ types: string[]; long_name: string }> | undefined;
+  const locality = components?.find((c) => c.types.includes('locality'));
+  return locality?.long_name ?? null;
+}
+
 function haversineDistanceMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 3958.8;
   const toRad = (d: number) => (d * Math.PI) / 180;
@@ -86,13 +101,26 @@ export const geoProxy = onCall(
     const key = googleMapsApiKey.value();
     if (!key) throw new HttpsError('internal', 'GOOGLE_MAPS_API_KEY not configured on server.');
 
-    const { type, query, queryB } = request.data as {
-      type: 'geocode' | 'distance' | 'weather';
-      query: string;
+    const { type, query, queryB, lat, lng } = request.data as {
+      type: 'geocode' | 'distance' | 'weather' | 'reverseGeocodeCity';
+      query?: string;
       queryB?: string;
+      lat?: number;
+      lng?: number;
     };
 
-    if (!type || !query) throw new HttpsError('invalid-argument', 'type and query are required.');
+    if (!type) throw new HttpsError('invalid-argument', 'type is required.');
+
+    // --- Reverse geocode (lat/lng → city) ---
+    if (type === 'reverseGeocodeCity') {
+      if (typeof lat !== 'number' || typeof lng !== 'number') {
+        throw new HttpsError('invalid-argument', 'lat and lng required for reverseGeocodeCity.');
+      }
+      const city = await reverseGeocodeCity(lat, lng, key);
+      return { city, result: city ?? '' };
+    }
+
+    if (!query) throw new HttpsError('invalid-argument', 'query is required.');
 
     // --- Geocode ---
     if (type === 'geocode') {
@@ -100,6 +128,9 @@ export const geoProxy = onCall(
       if (!geo) return { result: `No location found for "${query}".` };
       return {
         result: `${geo.formattedAddress} (coordinates: ${geo.lat.toFixed(4)}, ${geo.lng.toFixed(4)})`,
+        formattedAddress: geo.formattedAddress,
+        lat: geo.lat,
+        lng: geo.lng,
       };
     }
 
