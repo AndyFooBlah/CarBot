@@ -127,6 +127,36 @@ export const checkAndReserveVoiceQuota = onCall(
 );
 
 /**
+ * Read-only view of the caller's current daily quota usage. Used by the
+ * diagnostics page; does not mutate any state.
+ */
+export const getVoiceQuotaStatus = onCall(
+  { region: 'us-central1' },
+  async (request: CallableRequest): Promise<CheckResult> => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication required.');
+
+    const uid = request.auth.uid;
+    const dayKey = todayUtcKey();
+    const db = getFirestore();
+    const docRef = db.collection('_usage').doc(uid).collection('daily').doc(dayKey);
+
+    const snap = await docRef.get();
+    const data = (snap.exists ? snap.data() : {}) as QuotaDoc;
+    const sessions = data.sessionStartCount ?? 0;
+    const minutes = data.audioMinutes ?? 0;
+
+    const sessionsLeft = Math.max(0, MAX_SESSIONS_PER_DAY - sessions);
+    const minutesLeft = Math.max(0, MAX_AUDIO_MINUTES_PER_DAY - minutes);
+    return {
+      allowed: sessionsLeft > 0 && minutesLeft > 0,
+      sessionStartCount: sessions,
+      audioMinutes: minutes,
+      limits: { maxSessionsPerDay: MAX_SESSIONS_PER_DAY, maxAudioMinutesPerDay: MAX_AUDIO_MINUTES_PER_DAY },
+    };
+  },
+);
+
+/**
  * Records the duration of a completed session against the caller's daily
  * usage. Called from the client when the session ends (best-effort; if the
  * tab dies mid-session, we won't record — accepted trade-off).

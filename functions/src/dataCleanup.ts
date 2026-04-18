@@ -32,6 +32,14 @@ import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { geminiApiKey } from './memoryExtraction';
 import { generateCleanTranscript } from './cleanTranscript';
 import { extractMemoriesFromSession } from './memoryExtraction';
+import {
+  sendSessionSummaryEmail,
+  gmailClientId,
+  gmailClientSecret,
+  gmailRefreshToken,
+  carbotEmailAddress,
+  carbotWebUrl,
+} from './sessionSummaryEmail';
 
 // ---------------------------------------------------------------------------
 // Scheduled: clean transcripts missed by onSessionCompleted
@@ -95,6 +103,78 @@ export const cleanTranscriptForSession = onCall(
 
     console.log(`[cleanTranscriptForSession] Regenerating for session ${sessionId}`);
     await generateCleanTranscript(sessionId);
+    return { success: true };
+  },
+);
+
+/**
+ * Manually re-run memory extraction + summary generation for one session.
+ * Used by the diagnostics page when the automatic post-session trigger was
+ * missed or produced a poor result.
+ */
+export const extractMemoriesForSession = onCall(
+  {
+    secrets: [geminiApiKey],
+    region: 'us-central1',
+    timeoutSeconds: 300,
+    memory: '512MiB',
+  },
+  async (request: CallableRequest) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication required.');
+
+    const { sessionId } = request.data as { sessionId: string };
+    if (!sessionId || typeof sessionId !== 'string') {
+      throw new HttpsError('invalid-argument', 'sessionId is required.');
+    }
+
+    const db = getFirestore();
+    const sessionSnap = await db.collection('sessions').doc(sessionId).get();
+    if (!sessionSnap.exists) throw new HttpsError('not-found', 'Session not found.');
+    if (sessionSnap.data()?.userId !== request.auth.uid) {
+      throw new HttpsError('permission-denied', 'Session does not belong to you.');
+    }
+
+    console.log(`[extractMemoriesForSession] Re-running for session ${sessionId}`);
+    await extractMemoriesFromSession(sessionId);
+    return { success: true };
+  },
+);
+
+/**
+ * Manually re-send the session summary email for one session. Used by the
+ * diagnostics page to retry a failed email delivery.
+ */
+export const sendSummaryEmailForSession = onCall(
+  {
+    secrets: [
+      geminiApiKey,
+      gmailClientId,
+      gmailClientSecret,
+      gmailRefreshToken,
+      carbotEmailAddress,
+      carbotWebUrl,
+    ],
+    region: 'us-central1',
+    timeoutSeconds: 120,
+    memory: '256MiB',
+  },
+  async (request: CallableRequest) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication required.');
+
+    const { sessionId } = request.data as { sessionId: string };
+    if (!sessionId || typeof sessionId !== 'string') {
+      throw new HttpsError('invalid-argument', 'sessionId is required.');
+    }
+
+    const db = getFirestore();
+    const sessionSnap = await db.collection('sessions').doc(sessionId).get();
+    if (!sessionSnap.exists) throw new HttpsError('not-found', 'Session not found.');
+    if (sessionSnap.data()?.userId !== request.auth.uid) {
+      throw new HttpsError('permission-denied', 'Session does not belong to you.');
+    }
+
+    console.log(`[sendSummaryEmailForSession] Sending for session ${sessionId}`);
+    await sendSessionSummaryEmail(sessionId);
     return { success: true };
   },
 );

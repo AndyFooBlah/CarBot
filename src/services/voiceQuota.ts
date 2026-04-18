@@ -40,6 +40,12 @@ export async function checkAndReserveVoiceQuota(): Promise<VoiceQuotaCheckResult
   return res.data;
 }
 
+export async function getVoiceQuotaStatus(): Promise<VoiceQuotaCheckResult> {
+  const fn = httpsCallable<unknown, VoiceQuotaCheckResult>(functions, 'getVoiceQuotaStatus');
+  const res = await fn({});
+  return res.data;
+}
+
 export async function recordVoiceUsage(durationSeconds: number): Promise<void> {
   try {
     const fn = httpsCallable<{ durationSeconds: number }, { ok: boolean }>(functions, 'recordVoiceUsage');

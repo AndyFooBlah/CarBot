@@ -24,6 +24,7 @@
  *   /context  → ContextLibrary (auth-guarded)
  *   /memories → MemoryBrowser (auth-guarded)
  *   /settings → SettingsPage (auth-guarded)
+ *   /diagnostics → DiagnosticsPage (auth-guarded)
  */
 
 import React from 'react';
@@ -37,6 +38,7 @@ import { SessionView } from './components/session/SessionView';
 import { ContextLibrary } from './components/context/ContextLibrary';
 import { MemoryBrowser } from './components/memories/MemoryBrowser';
 import { SettingsPage } from './components/settings/SettingsPage';
+import { DiagnosticsPage } from './components/diagnostics/DiagnosticsPage';
 
 export default function App() {
   return (
@@ -54,6 +56,7 @@ export default function App() {
             <Route path="/context" element={<ContextLibrary />} />
             <Route path="/memories" element={<MemoryBrowser />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/diagnostics" element={<DiagnosticsPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

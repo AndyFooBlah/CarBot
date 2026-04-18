@@ -65,6 +65,7 @@ export function Layout() {
             <NavLink to="/context" className={navClass}>Context</NavLink>
             <NavLink to="/memories" className={navClass}>Memories</NavLink>
             <NavLink to="/settings" className={navClass}>Settings</NavLink>
+            <NavLink to="/diagnostics" className={navClass}>Diagnostics</NavLink>
           </div>
           <button
             onClick={handleSignOut}

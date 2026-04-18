@@ -48,8 +48,17 @@ import {
 } from './sessionSummaryEmail';
 
 export { geoProxy } from './geoProxy';
-export { dailyDataCleanup, cleanTranscriptForSession } from './dataCleanup';
-export { checkAndReserveVoiceQuota, recordVoiceUsage } from './voiceQuota';
+export {
+  dailyDataCleanup,
+  cleanTranscriptForSession,
+  extractMemoriesForSession,
+  sendSummaryEmailForSession,
+} from './dataCleanup';
+export {
+  checkAndReserveVoiceQuota,
+  recordVoiceUsage,
+  getVoiceQuotaStatus,
+} from './voiceQuota';
 
 initializeApp();
 

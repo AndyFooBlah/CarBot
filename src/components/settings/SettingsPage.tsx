@@ -26,7 +26,6 @@ import { GoogleGenAI } from '@google/genai';
 import { useAuth, getConfig } from '@andyfooblah/voice-common';
 import { proxyResolveAddress } from '../../services/geoProxy';
 import { useUserProfile } from '../../hooks/useUserProfile';
-import { SystemDiagnostics } from '../shared/SystemDiagnostics';
 import { previewVoice } from '../../services/voicePreview';
 import {
   saveRoutine,
@@ -702,8 +701,6 @@ export function SettingsPage() {
           Save Locations
         </button>
       </Section>
-
-      <SystemDiagnostics />
     </div>
   );
 }
