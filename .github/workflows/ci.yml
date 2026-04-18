@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+# CarBot consumes @andyfooblah/voice-common and @andyfooblah/knowledge-common
+# via `file:../voicecommon` and `file:../knowledgecommon` paths. In CI we
+# check out the peer repos as siblings so those paths resolve. A PAT with
+# contents:read on the peer repos must be stored as `PEER_REPO_TOKEN`.
 jobs:
   # ---------------------------------------------------------------------------
   # Frontend: type-check, lint, test
@@ -15,25 +19,58 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out CarBot
+        uses: actions/checkout@v4
+        with:
+          path: carbot
+
+      - name: Check out VoiceCommon
+        uses: actions/checkout@v4
+        with:
+          repository: andyfooblah/VoiceCommon
+          token: ${{ secrets.PEER_REPO_TOKEN }}
+          path: voicecommon
+
+      - name: Check out KnowledgeCommon
+        uses: actions/checkout@v4
+        with:
+          repository: andyfooblah/KnowledgeCommon
+          token: ${{ secrets.PEER_REPO_TOKEN }}
+          path: knowledgecommon
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: carbot/package-lock.json
+
+      - name: Build VoiceCommon lib
+        working-directory: voicecommon
+        run: |
+          npm ci
+          npm run build:lib
+
+      - name: Build KnowledgeCommon lib
+        working-directory: knowledgecommon
+        run: |
+          npm ci
+          npm run build:lib
 
       - name: Install dependencies
+        working-directory: carbot
         run: npm ci
 
       - name: Type-check
+        working-directory: carbot
         run: npx tsc --noEmit
 
       - name: Lint
+        working-directory: carbot
         run: npx eslint src --ext .ts,.tsx
 
       - name: Run tests
+        working-directory: carbot
         run: npm test
 
   # ---------------------------------------------------------------------------
@@ -45,17 +82,20 @@ jobs:
 
     defaults:
       run:
-        working-directory: functions
+        working-directory: carbot/functions
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out CarBot
+        uses: actions/checkout@v4
+        with:
+          path: carbot
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: functions/package-lock.json
+          cache-dependency-path: carbot/functions/package-lock.json
 
       - name: Install dependencies
         run: npm ci
