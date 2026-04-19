@@ -21,6 +21,10 @@ export default defineConfig({
   server: {
     port: 3004,
     host: '0.0.0.0',
+    // signInWithPopup requires these to avoid COOP violations closing the popup.
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+    },
   },
   plugins: [tailwindcss(), react()],
   resolve: {

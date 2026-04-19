@@ -36,6 +36,8 @@ import {
   getDistanceBetweenPlaces,
   getJoke,
   searchWikipedia,
+  getTimeDifference,
+  getTimeOffset,
 } from '@andyfooblah/knowledge-common';
 import { getActiveContextDocuments } from '../services/contextDocuments';
 import { buildCarbotInstruction, getCurrentCity, computeTripContext } from '../services/instructionBuilder';
@@ -93,24 +95,53 @@ export function useCarbotSession(options: UseCarbotSessionOptions): UseCarbotSes
     speechConfig: profile.selectedVoice ? {
       voiceConfig: { prebuiltVoiceConfig: { voiceName: profile.selectedVoice } },
     } : undefined,
-    onToolCall: async (name: string, args: Record<string, unknown>) => {
-      switch (name) {
-        case 'getWeather':
-          return getWeather(args.location as string);
-        case 'searchPlace':
-          return searchPlace(args.query as string);
-        case 'getDistanceBetweenPlaces':
-          return getDistanceBetweenPlaces(args.from as string, args.to as string);
-        case 'getJoke':
-          return getJoke(args.category as string | undefined);
-        case 'searchWikipedia':
-          return searchWikipedia({
-            question: args.question as string,
-            maxChunks: args.maxChunks as number | undefined,
-            maxAgeDays: args.maxAgeDays as number | undefined,
-          });
-        default:
-          return `Unknown tool: ${name}`;
+    onToolCall: async (name: string, args: Record<string, unknown>): Promise<string> => {
+      console.log('[CarBot] tool call:', name, args);
+      try {
+        let result: string;
+        switch (name) {
+          case 'getWeather':
+            result = await getWeather(args.location as string);
+            break;
+          case 'searchPlace':
+            result = await searchPlace(args.query as string);
+            break;
+          case 'getDistanceBetweenPlaces':
+            result = await getDistanceBetweenPlaces(args.from as string, args.to as string);
+            break;
+          case 'getJoke':
+            result = await getJoke(args.category as string | undefined);
+            break;
+          case 'searchWikipedia':
+            result = await searchWikipedia({
+              question: args.question as string,
+              maxChunks: args.maxChunks as number | undefined,
+              maxAgeDays: args.maxAgeDays as number | undefined,
+            });
+            break;
+          case 'computeTimeDifference':
+            result = await getTimeDifference(
+              args.dateA as string,
+              args.dateB as string,
+              args.currentDateTime as string,
+            );
+            break;
+          case 'computeTimeOffset':
+            result = await getTimeOffset(
+              args.date as string,
+              args.offset as string,
+              args.currentDateTime as string,
+            );
+            break;
+          default:
+            console.warn('[CarBot] unknown tool:', name);
+            return `Unknown tool: ${name}`;
+        }
+        console.log('[CarBot] tool result for', name, ':', result);
+        return result;
+      } catch (err) {
+        console.error('[CarBot] tool error for', name, ':', err);
+        throw err;
       }
     },
     onSessionEndRequest,
