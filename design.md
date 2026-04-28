@@ -404,9 +404,18 @@ sessions/{userId}/{sessionId}.webm: allow read, write if request.auth.uid == use
 
 Gmail API credentials (OAuth2 refresh token or service account key) are stored as Cloud Function environment secrets (Firebase Secret Manager). Never written to Firestore or returned to the client.
 
-### 7.4 Client-Side API Keys
+### 7.4 Gemini API key handling
 
-Gemini API key is present in the browser bundle (via `initializeVoiceCommon`). This is acceptable for the single-user self-hosted model: the key is the owner's own key from Google AI Studio. The Gemini key scope should be limited to Gemini Live only.
+`GEMINI_API_KEY` lives only in Firebase Secret Manager. CarBot's own client code routes every Gemini call through two server-side callables:
+
+| Callable | Purpose | Per-user daily quota |
+|---|---|---|
+| `mintGeminiLiveToken` | Issues a single-use ephemeral token (~30 min TTL, ~60 s window to open the Live session) for browser-direct Gemini Live WebSocket auth | 200 |
+| `invokeGemini` | Generic proxy for `ai.models.generateContent` — used for non-realtime text generation (schedule parsing in `SettingsPage`, etc.) with model allow-list and `maxOutputTokens` ceiling | 1000 |
+
+VoiceCommon's `useSession` is wired up via the `tokenProvider` option of `initializeVoiceCommon` (see `src/index.tsx`), so the library asks CarBot for an ephemeral token before opening the Live WebSocket and never sees the long-lived key. The previous design — passing `geminiApiKey` straight to `initializeVoiceCommon` — has been removed; that pattern repeated the prior incident (key bundled in JS, harvested, abused).
+
+**Open gap (TODO K1):** KnowledgeCommon (Wikipedia RAG, date-time tools) still calls Gemini directly from the browser using a key passed via `initializeKnowledgeCommon({ geminiApiKey })`. Until KnowledgeCommon supports a tokenProvider, `VITE_GEMINI_API_KEY` remains in CarBot's bundle for those tools' use. See DEPLOYMENT.md for the residual mitigations (HTTP referrer + API restrictions in GCP Console).
 
 ---
 

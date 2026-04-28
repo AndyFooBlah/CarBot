@@ -29,6 +29,7 @@ import { db, useAuth, getUserSessions } from '@andyfooblah/voice-common';
 import type { SessionMetadata } from '@andyfooblah/voice-common';
 import { searchWikipedia, getJoke } from '@andyfooblah/knowledge-common';
 import { proxySearchPlace, proxyGetWeather, proxyGetDistanceBetweenPlaces } from '../../services/geoProxy';
+import { mintGeminiLiveToken } from '../../services/geminiBroker';
 import { getVoiceQuotaStatus, type VoiceQuotaCheckResult } from '../../services/voiceQuota';
 import {
   callCleanTranscriptForSession,
@@ -137,9 +138,11 @@ function ServiceProbes({ uid }: { uid: string | undefined }) {
         await getDoc(doc(db, 'users', uid));
       }),
       probe('Gemini 3.1 Flash Live (WebSocket reachability)', async () => {
-        const key = import.meta.env.VITE_GEMINI_API_KEY as string;
-        if (!key) throw new Error('VITE_GEMINI_API_KEY not configured');
-        const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${key}`;
+        // Mint an ephemeral token via the server-side broker (same path real
+        // sessions take) and use it to open the Live WebSocket. A green probe
+        // means broker → token mint → Gemini Live are all reachable.
+        const { token } = await mintGeminiLiveToken();
+        const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${token}`;
         await new Promise<void>((resolve, reject) => {
           const ws = new WebSocket(url);
           const timer = setTimeout(() => { ws.close(); reject(new Error('timeout')); }, 6000);

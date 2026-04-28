@@ -22,22 +22,25 @@
  */
 
 import { GoogleGenAI, Modality, ThinkingLevel } from '@google/genai';
+import { mintGeminiLiveToken } from './geminiBroker';
 
 const PREVIEW_MODEL = 'gemini-3.1-flash-live-preview';
 
 /**
  * Play a short voice preview of the given voice saying "Hi! I'm <botName>."
  *
+ * Authenticates the Live WebSocket with a single-use ephemeral token minted
+ * by the server-side broker — no long-lived Gemini key in the browser.
+ *
  * @param voiceName  - Gemini Live voice name (e.g. "Puck", "Kore")
  * @param botName    - Name the bot introduces itself with
- * @param apiKey     - Gemini API key
  */
 export async function previewVoice(
   voiceName: string,
   botName: string,
-  apiKey: string,
 ): Promise<void> {
-  const ai = new GoogleGenAI({ apiKey });
+  const { token } = await mintGeminiLiveToken();
+  const ai = new GoogleGenAI({ apiKey: token });
 
   // Web Audio context at 24 kHz to match Gemini Live PCM output rate
   const audioCtx = new AudioContext({ sampleRate: 24000 });

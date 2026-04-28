@@ -22,11 +22,11 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { GoogleGenAI } from '@google/genai';
-import { useAuth, getGeminiApiKey } from '@andyfooblah/voice-common';
+import { useAuth } from '@andyfooblah/voice-common';
 import { proxyResolveAddress } from '../../services/geoProxy';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { previewVoice } from '../../services/voicePreview';
+import { invokeGemini } from '../../services/geminiBroker';
 import {
   saveRoutine,
   saveLocations,
@@ -61,9 +61,7 @@ interface ParsedOccurrence {
 async function parseScheduleWithGemini(
   activityName: string,
   description: string,
-  apiKey: string,
 ): Promise<ParsedOccurrence[]> {
-  const ai = new GoogleGenAI({ apiKey });
   const prompt = `You are a schedule parser. Parse the following schedule description into structured JSON.
 
 Activity name: "${activityName}"
@@ -81,7 +79,7 @@ Examples:
 
 Return only valid JSON array, nothing else.`;
 
-  const response = await ai.models.generateContent({
+  const response = await invokeGemini({
     model: 'gemini-3-flash-preview',
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
   });
@@ -217,9 +215,7 @@ function AddActivityForm({
     setParsing(true);
     setParseError('');
     try {
-      const apiKey = getGeminiApiKey();
-      if (!apiKey) throw new Error('No Gemini API key configured');
-      const occurrences = await parseScheduleWithGemini(name.trim(), description.trim(), apiKey);
+      const occurrences = await parseScheduleWithGemini(name.trim(), description.trim());
       if (occurrences.length === 0) {
         setParseError("Couldn't find any day/time patterns — try rephrasing.");
         return;
@@ -529,9 +525,7 @@ export function SettingsPage() {
               onClick={async () => {
                 setVoicePreviewState('loading');
                 try {
-                  const apiKey = getGeminiApiKey();
-                  if (!apiKey) throw new Error('No Gemini API key configured');
-                  await previewVoice(selectedVoice, botName.trim() || 'CarBot', apiKey);
+                  await previewVoice(selectedVoice, botName.trim() || 'CarBot');
                   setVoicePreviewState('idle');
                 } catch {
                   setVoicePreviewState('error');

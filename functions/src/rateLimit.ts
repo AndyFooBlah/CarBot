@@ -26,6 +26,8 @@ import { HttpsError } from 'firebase-functions/v2/https';
 export const RATE_LIMITS = {
   geoProxy: 500,
   cacheWikipediaArticle: 100,
+  mintGeminiLiveToken: 200,
+  invokeGemini: 1000,
 } as const;
 
 export type RateLimitBucket = keyof typeof RATE_LIMITS;

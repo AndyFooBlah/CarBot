@@ -39,6 +39,9 @@ import { ingestEmails } from './emailIngestion';
 import {
   geminiApiKey,
 } from './memoryExtraction';
+import { onCall } from 'firebase-functions/v2/https';
+import { buildMintGeminiLiveTokenHandler } from './liveToken';
+import { buildInvokeGeminiHandler } from './invokeGemini';
 import {
   gmailClientId,
   gmailClientSecret,
@@ -49,6 +52,17 @@ import {
 
 export { geoProxy } from './geoProxy';
 export { cacheWikipediaArticle } from './cacheWikipedia';
+
+export const mintGeminiLiveToken = onCall(
+  { secrets: [geminiApiKey], timeoutSeconds: 30, region: 'us-central1' },
+  buildMintGeminiLiveTokenHandler({ apiKey: () => geminiApiKey.value() }),
+);
+
+export const invokeGemini = onCall(
+  { secrets: [geminiApiKey], timeoutSeconds: 120, region: 'us-central1' },
+  buildInvokeGeminiHandler({ apiKey: () => geminiApiKey.value() }),
+);
+
 export {
   dailyDataCleanup,
   cleanTranscriptForSession,
