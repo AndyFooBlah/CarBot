@@ -5,14 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/check-bundle-for-secrets.mjs",
     "preview": "vite preview",
     "lint": "eslint src --ext .ts,.tsx",
     "test": "vitest run",
     "test:watch": "vitest",
     "type-check": "tsc --noEmit",
-    "deploy": "vite build && firebase deploy",
-    "deploy:preview": "vite build && firebase hosting:channel:deploy preview"
+    "check:bundle": "node scripts/check-bundle-for-secrets.mjs",
+    "deploy": "npm run build && firebase deploy",
+    "deploy:preview": "npm run build && firebase hosting:channel:deploy preview"
   },
   "dependencies": {
     "@andyfooblah/knowledge-common": "file:../knowledgecommon",

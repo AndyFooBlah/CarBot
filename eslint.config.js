@@ -40,6 +40,32 @@ export default [
       'react-hooks/exhaustive-deps': 'warn',
       'react-hooks/set-state-in-effect': 'off',
       '@typescript-eslint/no-unsafe-function-type': 'error',
+      // Hard rule: no sensitive API keys may be read from VITE_* env vars in
+      // browser code. Vite bakes every VITE_* into the bundle as a literal,
+      // so even a "harmless" reference is enough to leak the value. Gemini
+      // and Maps keys must come exclusively from the server-side broker
+      // callables. Firebase web config is intentionally public and allowed.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "MemberExpression[object.object.type='MetaProperty'][object.property.name='env'][property.name=/^VITE_GEMINI/]",
+          message:
+            'Do not read VITE_GEMINI_* in client code. Gemini calls go through the broker (services/geminiBroker.ts → mintGeminiLiveToken / invokeGemini / embedGemini). The key lives only in Firebase Secret Manager.',
+        },
+        {
+          selector:
+            "MemberExpression[object.object.type='MetaProperty'][object.property.name='env'][property.name=/^VITE_GOOGLE_MAPS/]",
+          message:
+            'Do not read VITE_GOOGLE_MAPS_* in client code. Maps + Weather go through the geoProxy Cloud Function; the key lives only in Firebase Secret Manager.',
+        },
+        {
+          selector:
+            "MemberExpression[object.object.type='MetaProperty'][object.property.name='env'][property.name=/_(SECRET|TOKEN)$/]",
+          message:
+            'Do not read VITE_*_SECRET / VITE_*_TOKEN in client code. Anything VITE_* prefixed is bundled into the browser JS verbatim. Secrets belong in Firebase Secret Manager and reach the client only via short-lived broker callables.',
+        },
+      ],
     },
   },
   {
