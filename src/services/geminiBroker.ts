@@ -66,3 +66,23 @@ export async function invokeGemini(
   const res = await fn(req);
   return res.data;
 }
+
+export interface EmbedGeminiRequest {
+  model: string;
+  contents: string[];
+}
+
+export interface EmbedGeminiResponse {
+  embeddings: number[][];
+}
+
+export async function embedGemini(
+  req: EmbedGeminiRequest,
+): Promise<EmbedGeminiResponse> {
+  const fn = httpsCallable<EmbedGeminiRequest, EmbedGeminiResponse>(
+    functions,
+    'embedGemini',
+  );
+  const res = await fn(req);
+  return res.data;
+}

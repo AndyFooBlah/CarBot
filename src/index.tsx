@@ -27,7 +27,7 @@ import App from './App';
 import { initializeVoiceCommon, db } from '@andyfooblah/voice-common';
 import { initializeKnowledgeCommon } from '@andyfooblah/knowledge-common';
 import { proxyGetWeather, proxySearchPlace, proxyGetDistanceBetweenPlaces, proxyCacheWikipediaArticle } from './services/geoProxy';
-import { mintGeminiLiveToken } from './services/geminiBroker';
+import { mintGeminiLiveToken, invokeGemini, embedGemini } from './services/geminiBroker';
 
 initializeVoiceCommon({
   firebase: {
@@ -45,12 +45,10 @@ initializeVoiceCommon({
 });
 
 initializeKnowledgeCommon({
-  // TODO(K1): KnowledgeCommon's Wikipedia RAG and date-time tools still call
-  // Gemini directly from the browser using this key. Until KnowledgeCommon
-  // gains broker support, VITE_GEMINI_API_KEY remains in CarBot's bundle for
-  // these tools' use only. CarBot's own code (settings, voicePreview,
-  // diagnostics, sessions) no longer reads it.
-  geminiApiKey: import.meta.env.VITE_GEMINI_API_KEY,
+  // KnowledgeCommon 1.0 routes every internal Gemini call through this broker
+  // (server-side Cloud Function callables that hold GEMINI_API_KEY in Firebase
+  // Secret Manager). The long-lived key never reaches the browser.
+  gemini: { invokeGemini, embedContent: embedGemini },
   firestore: db,
   // Maps and Weather APIs don't allow browser CORS; route through geoProxy Cloud Function.
   toolOverrides: {
