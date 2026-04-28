@@ -1,5 +1,32 @@
 # CarBot — Claude Code Instructions
 
+## 🔑 Sensitive API keys — read first
+
+`GEMINI_API_KEY` and `GOOGLE_MAPS_API_KEY` are **server-side only**. They live in Firebase Secret Manager and are accessed only by Cloud Functions. They must NEVER appear in:
+
+- A `VITE_*` env var (Vite bakes the entire `import.meta.env` object into the bundle, so even an unreferenced `.env.local` entry leaks)
+- Any file under `src/` — directly, in fallbacks, in comments-as-examples, or in test fixtures that touch real values
+- Any committed file (including `.env.example`, `dist/`, docs)
+
+The browser reaches Gemini exclusively via the broker callables in `src/services/geminiBroker.ts`:
+
+| Need | Use |
+|---|---|
+| Gemini Live WebSocket session (sessions, voice preview, diagnostics) | `mintGeminiLiveToken()` → ephemeral token (~30 min, single-use) |
+| `ai.models.generateContent` (e.g. schedule parsing in `SettingsPage`) | `invokeGemini({ model, contents, config? })` |
+| `ai.models.embedContent` (used inside KnowledgeCommon's Wikipedia RAG) | `embedGemini({ model, contents })` |
+
+CarBot wires `{ invokeGemini, embedContent: embedGemini }` into `initializeKnowledgeCommon` so the library never holds a key either.
+
+**Two automated guards stop accidental regressions:**
+
+1. **ESLint** (`eslint.config.js`) — `no-restricted-syntax` errors on any read of `import.meta.env.VITE_GEMINI_*`, `VITE_GOOGLE_MAPS_*`, or `VITE_*_(SECRET|TOKEN)`. Each rule fires with a message naming the broker callable to use instead.
+2. **Post-build bundle scan** (`scripts/check-bundle-for-secrets.mjs`, run as part of `npm run build`) — greps `dist/` for `AIza...`, `sk-...`, `ya29...`, `xox*-...`, `gh*_...`, GCP service-account JSON shapes. The Firebase web `apiKey` is auto-allowlisted from `.env.local`. Anything else fails the build.
+
+If either guard fires, **fix the leak**; do not weaken the rule.
+
+To rotate the server-side Gemini key: `firebase functions:secrets:set GEMINI_API_KEY`, then redeploy functions.
+
 ## After any material change
 
 Before considering a task complete, ensure all of the following are done:
