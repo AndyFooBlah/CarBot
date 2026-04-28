@@ -28,6 +28,7 @@ export const RATE_LIMITS = {
   cacheWikipediaArticle: 100,
   mintGeminiLiveToken: 200,
   invokeGemini: 1000,
+  embedGemini: 500,
 } as const;
 
 export type RateLimitBucket = keyof typeof RATE_LIMITS;

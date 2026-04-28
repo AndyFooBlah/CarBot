@@ -42,6 +42,7 @@ import {
 import { onCall } from 'firebase-functions/v2/https';
 import { buildMintGeminiLiveTokenHandler } from './liveToken';
 import { buildInvokeGeminiHandler } from './invokeGemini';
+import { buildEmbedGeminiHandler } from './embedGemini';
 import {
   gmailClientId,
   gmailClientSecret,
@@ -61,6 +62,11 @@ export const mintGeminiLiveToken = onCall(
 export const invokeGemini = onCall(
   { secrets: [geminiApiKey], timeoutSeconds: 120, region: 'us-central1' },
   buildInvokeGeminiHandler({ apiKey: () => geminiApiKey.value() }),
+);
+
+export const embedGemini = onCall(
+  { secrets: [geminiApiKey], timeoutSeconds: 60, region: 'us-central1' },
+  buildEmbedGeminiHandler({ apiKey: () => geminiApiKey.value() }),
 );
 
 export {
