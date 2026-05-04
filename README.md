@@ -198,13 +198,14 @@ VITE_FIREBASE_PROJECT_ID=        # yourproject
 VITE_FIREBASE_STORAGE_BUCKET=    # yourproject.firebasestorage.app
 VITE_FIREBASE_MESSAGING_SENDER_ID=
 VITE_FIREBASE_APP_ID=
-VITE_GEMINI_API_KEY=             # aistudio.google.com → Get API key
 ```
 
-The Google Maps API key is **not** configured on the client. Maps, weather,
-and geocoding calls route through the server-side `geoProxy` callable
-function, which reads `GOOGLE_MAPS_API_KEY` from Firebase Secret Manager
-(see the secrets section below).
+Both **Gemini** and **Google Maps** API keys are **not** configured on the client. They are stored in Firebase Secret Manager and accessed via server-side callable functions:
+- Gemini Live (Voice): `mintGeminiLiveToken`
+- Gemini Text/Embeddings: `invokeGemini` / `embedGemini`
+- Maps/Weather: `geoProxy`
+
+See the "Security" section below and Step 4c for secret setup instructions.
 
 ### 4. Gmail OAuth2 credentials
 
