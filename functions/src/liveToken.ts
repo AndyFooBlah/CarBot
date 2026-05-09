@@ -63,7 +63,10 @@ export function buildMintGeminiLiveTokenHandler(deps: {
     const expireTime = new Date(now + TOKEN_TTL_MS).toISOString();
     const newSessionExpireTime = new Date(now + NEW_SESSION_WINDOW_MS).toISOString();
 
-    const ai = new GoogleGenAI({ apiKey });
+    // authTokens.create is exposed only on the v1alpha endpoint; the SDK
+    // defaults to v1, which returns 404 for this method. Pin v1alpha here.
+    // See https://ai.google.dev/gemini-api/docs/ephemeral-tokens
+    const ai = new GoogleGenAI({ apiKey, httpOptions: { apiVersion: 'v1alpha' } });
     try {
       const token = await ai.authTokens.create({
         config: {
