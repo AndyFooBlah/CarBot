@@ -62,7 +62,7 @@ firebase emulator:start        # start local emulators
 
 ## VoiceCommon dependency
 
-CarBot uses `@andyfooblah/voicecommon` as a `file:../voicecommon` dependency.
+CarBot uses `@andyfooblah/voice-common` as a `file:../VoiceCommon` dependency.
 After any changes to VoiceCommon, run `npm run build:lib` in the VoiceCommon
 directory, then `npm install` here to pick up the updated dist.
 
@@ -70,7 +70,7 @@ directory, then `npm install` here to pick up the updated dist.
 
 ### VoiceCommon integration
 - Call `initializeVoiceCommon(config)` in `src/index.tsx` before `ReactDOM.createRoot()`
-- Import Firebase services (`db`, `auth`, `storage`) from `@andyfooblah/voicecommon`
+- Import Firebase services (`db`, `auth`, `storage`) from `@andyfooblah/voice-common`
 - Use `useSession` from VoiceCommon; wrap it in `useCarbotSession` for CarBot-specific behavior
 - The CarBot system instruction is assembled by `src/services/instructionBuilder.ts`
 

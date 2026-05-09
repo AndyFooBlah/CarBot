@@ -55,8 +55,8 @@ Built on [`@andyfooblah/voice-common`](https://github.com/AndyFooBlah/VoiceCommo
 | Layer | Technology |
 |---|---|
 | Frontend framework | React 19, TypeScript, Vite, Tailwind CSS v4 |
-| Voice AI framework | [`@andyfooblah/voice-common`](https://github.com/AndyFooBlah/VoiceCommon) v0.4.1 |
-| Knowledge tools | [`@andyfooblah/knowledge-common`](https://github.com/AndyFooBlah/KnowledgeCommon) v0.3.0 |
+| Voice AI framework | [`@andyfooblah/voice-common`](https://github.com/AndyFooBlah/VoiceCommon) v0.6.0+ |
+| Knowledge tools | [`@andyfooblah/knowledge-common`](https://github.com/AndyFooBlah/KnowledgeCommon) v1.0.0+ |
 | Voice model | Google Gemini Live (`gemini-2.5-flash-preview-native-audio-dialog`) |
 | Post-processing AI | Google Gemini 2.0 Flash |
 | Auth | Firebase Authentication (Google OAuth + email/password) |
@@ -156,7 +156,7 @@ npm install
 cd functions && npm install && cd ..
 ```
 
-CarBot depends on VoiceCommon and KnowledgeCommon as local packages (`file:../voicecommon`, `file:../knowledgecommon`). Clone both alongside CarBot so the paths resolve:
+CarBot depends on VoiceCommon and KnowledgeCommon as local packages (`file:../VoiceCommon`, `file:../knowledgecommon`). Clone both alongside CarBot so the paths resolve:
 
 ```bash
 # In the parent directory:
@@ -359,7 +359,7 @@ Email summaries can be disabled in **Settings → Profile**.
 - Transcript originals are read-only from the client; edits go to a separate `transcriptEdits` subcollection.
 - Session audio is stored at `sessions/{userId}/{sessionId}.webm` and is only accessible to the owning user.
 - Gmail credentials (OAuth2 refresh token) are stored in Firebase Secret Manager and never exposed to the client.
-- The Gemini API key is present in the browser bundle — this is intentional for the self-hosted single-user model. Scope your key to Gemini Live only in Google AI Studio.
+- **Gemini and Google Maps API keys live only in Firebase Secret Manager.** The browser bundle contains no sensitive keys. The browser reaches Gemini via three server-side broker callables — `mintGeminiLiveToken` (Live, single-use ephemeral tokens), `invokeGemini` (text generation), and `embedGemini` (embeddings) — each auth-gated and per-user rate-limited. Maps and Weather flow through `geoProxy`. The bundle is scanned for known key shapes on every build (`scripts/check-bundle-for-secrets.mjs`); the build fails if a Gemini or Maps key ever appears in `dist/`.
 
 ---
 
