@@ -39,8 +39,22 @@ export function SessionView() {
   // without being recreated (which would require re-passing it to the hook).
   const sessionIdRef = React.useRef<string | null>(null);
 
+  // The bot can request session end via the `endSession` tool. We have to
+  // actually call stopSession here — without it, the session document stays
+  // at status='active' forever, finalizeSession never runs, and the entire
+  // post-session pipeline (memory extraction, summary, voice-quota recording)
+  // dies silently. Earlier code only navigated away; pre-2026-05-09 sessions
+  // are orphaned in active state because of this. stopSessionRef breaks the
+  // dependency cycle (stopSession is created by useCarbotSession below, this
+  // callback is passed into it).
+  const stopSessionRef = React.useRef<(() => Promise<void>) | null>(null);
   const onSessionEndRequest = useCallback(async () => {
     const id = sessionIdRef.current;
+    try {
+      await stopSessionRef.current?.();
+    } catch (err) {
+      console.error('[SessionView] stopSession failed during onSessionEndRequest:', err);
+    }
     navigate(id ? `/sessions/${id}` : '/sessions');
   }, [navigate]);
 
@@ -69,6 +83,12 @@ export function SessionView() {
   React.useEffect(() => {
     sessionIdRef.current = sessionId ?? null;
   }, [sessionId]);
+
+  // Keep stopSession ref in sync so onSessionEndRequest can call the latest
+  // version without re-triggering the useSession hook.
+  React.useEffect(() => {
+    stopSessionRef.current = stopSession;
+  }, [stopSession]);
 
   const handleStop = async () => {
     await stopSession();
