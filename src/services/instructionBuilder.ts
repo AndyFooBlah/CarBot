@@ -152,10 +152,19 @@ Vary your phrasing each session — don't repeat the same opening. Do not exceed
 
   // --- 7. Knowledge tools ---
   parts.push(`TOOLS — you have these tools available and MUST use them:
-- ALWAYS call 'searchWikipedia' before answering questions about specific facts, historical events, people, animals, places, science topics, or anything from the real world. Never answer factual questions from memory alone — always look them up first. Before calling the tool, say something natural like "Let me check that on Wikipedia" or "Give me a second to look that up" — the search can take a few seconds and this keeps the conversation from feeling silent.
-- Call 'getWeather' when the user asks about the weather or mentions going somewhere.
-- Call 'searchPlace' or 'getDistanceBetweenPlaces' for location or distance questions.
-- Call 'getJoke' when the user asks for a joke or when a moment of levity feels right.`);
+
+CRITICAL — narrate before any slow tool: searchWikipedia takes 5–15 seconds to run. \`getWeather\`, \`searchPlace\`, \`getDistanceBetweenPlaces\`, \`computeTimeDifference\`, and \`computeTimeOffset\` can each take 1–3 seconds. Silence during that time feels broken to a passenger. Before you invoke any of those tools, ALWAYS say one short spoken sentence to the user first — a "let me check that" beat — and only THEN call the tool. Vary the phrasing so it doesn't sound robotic: "Let me check that on Wikipedia", "Give me a second to look that up", "Hang on, looking that up now", "One sec, checking the weather", "Let me grab the distance for you". This rule is not optional — the user has explicitly asked for it.
+
+- ALWAYS call 'searchWikipedia' before answering questions about specific facts, historical events, people, animals, places, science topics, or anything from the real world. Never answer factual questions from memory alone — always look them up first. Apply the narrate-first rule above.
+- Call 'getWeather' when the user asks about the weather or mentions going somewhere. Apply the narrate-first rule.
+- Call 'searchPlace' or 'getDistanceBetweenPlaces' for location or distance questions. Apply the narrate-first rule.
+- Call 'getJoke' when the user asks for a joke or when a moment of levity feels right. (Fast — narration optional but a short setup is fine.)
+- Call 'computeTimeDifference' / 'computeTimeOffset' for "how long ago / how old / when was X relative to Y" questions. Apply the narrate-first rule.
+
+MATH-GAME TOOLS — for when the user (especially a school-aged kid) wants a quick mental-math drill:
+- 'generateMathProblem' returns a 2-digit add or subtract problem (10–99 range; subtraction never goes negative). The result includes the operands AND the correct answer for your private use — DO NOT speak the correct answer aloud, only ask the question.
+- 'checkMathAnswer' verifies the user's response. Pass the same a, b, and operation values from generateMathProblem plus the number the user said. The tool tells you whether they were right and what the correct answer is — be the source of truth, don't compute it yourself.
+Offer math games when it feels natural (kid says they're bored, asks to play a game, mentions homework). Don't force it; if they decline, drop the topic.`);
 
   return parts.join('\n\n');
 }

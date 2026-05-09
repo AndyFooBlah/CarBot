@@ -41,6 +41,11 @@ import {
 } from '@andyfooblah/knowledge-common';
 import { getActiveContextDocuments } from '../services/contextDocuments';
 import { buildCarbotInstruction, getCurrentCity, computeTripContext } from '../services/instructionBuilder';
+import {
+  allMathGameTools,
+  generateMathProblem,
+  checkMathAnswer,
+} from '../services/mathGames';
 import { setSessionCarbotFields } from '../services/sessions';
 import { markBotNameIntroduced } from '../services/userProfile';
 import { checkAndReserveVoiceQuota, recordVoiceUsage } from '../services/voiceQuota';
@@ -90,7 +95,7 @@ export function useCarbotSession(options: UseCarbotSessionOptions): UseCarbotSes
   const vcSession = useSession({
     userId,
     systemInstruction,
-    tools: allKnowledgeTools,
+    tools: [...allKnowledgeTools, ...allMathGameTools],
     autoGreetText: '[Session started. Please greet the family and begin the conversation as described in your instructions.]',
     speechConfig: profile.selectedVoice ? {
       voiceConfig: { prebuiltVoiceConfig: { voiceName: profile.selectedVoice } },
@@ -132,6 +137,17 @@ export function useCarbotSession(options: UseCarbotSessionOptions): UseCarbotSes
               args.offset as string,
               args.currentDateTime as string,
             );
+            break;
+          case 'generateMathProblem':
+            result = generateMathProblem(args.operation as string | undefined);
+            break;
+          case 'checkMathAnswer':
+            result = checkMathAnswer({
+              a: args.a as number,
+              b: args.b as number,
+              operation: args.operation as string,
+              userAnswer: args.userAnswer as number,
+            });
             break;
           default:
             console.warn('[CarBot] unknown tool:', name);
