@@ -16,7 +16,7 @@
  * CarBot application router.
  *
  * Routes:
- *   /         → /sessions (redirect)
+ *   /         → Home (auth-guarded landing page)
  *   /login    → LoginScreen (public)
  *   /sessions → SessionList (auth-guarded via Layout)
  *   /sessions/new → SessionView (auth-guarded via Layout)
@@ -28,10 +28,11 @@
  */
 
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
 import { Layout } from './components/shared/Layout';
 import { LoginScreen } from './components/auth/LoginScreen';
+import { Home } from './components/home/Home';
 import { SessionList } from './components/history/SessionList';
 import { SessionDetail } from './components/history/SessionDetail';
 import { SessionView } from './components/session/SessionView';
@@ -45,11 +46,11 @@ export default function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Navigate to="/sessions" replace />} />
           <Route path="/login" element={<LoginScreen />} />
 
           {/* Auth-guarded routes inside Layout */}
           <Route element={<Layout />}>
+            <Route path="/" element={<Home />} />
             <Route path="/sessions" element={<SessionList />} />
             <Route path="/sessions/new" element={<SessionView />} />
             <Route path="/sessions/:id" element={<SessionDetail />} />

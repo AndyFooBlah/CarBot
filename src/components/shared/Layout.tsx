@@ -54,7 +54,7 @@ export function Layout() {
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 flex items-center justify-between h-14">
           <div className="flex items-center gap-1">
-            <span className="text-xl font-bold text-blue-600 mr-4">🚗 CarBot</span>
+            <NavLink to="/" className="text-xl font-bold text-blue-600 mr-4 hover:opacity-80 transition-opacity">🚗 CarBot</NavLink>
             <NavLink to="/sessions" className={navClass}>Sessions</NavLink>
             <NavLink to="/sessions/new" className={navClass}>
               <span className="flex items-center gap-1">
