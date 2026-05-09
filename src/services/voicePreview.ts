@@ -40,7 +40,8 @@ export async function previewVoice(
   botName: string,
 ): Promise<void> {
   const { token } = await mintGeminiLiveToken();
-  const ai = new GoogleGenAI({ apiKey: token });
+  // Ephemeral token requires v1alpha — see services/geminiBroker.ts for context.
+  const ai = new GoogleGenAI({ apiKey: token, httpOptions: { apiVersion: 'v1alpha' } });
 
   // Web Audio context at 24 kHz to match Gemini Live PCM output rate
   const audioCtx = new AudioContext({ sampleRate: 24000 });
