@@ -62,7 +62,7 @@ firebase emulator:start        # start local emulators
 
 ## VoiceCommon dependency
 
-CarBot uses `@andyfooblah/voice-common` as a `file:../VoiceCommon` dependency.
+CarBot uses `@andyfooblah/voice-common` as a `file:../voicecommon` dependency.
 After any changes to VoiceCommon, run `npm run build:lib` in the VoiceCommon
 directory, then `npm install` here to pick up the updated dist.
 

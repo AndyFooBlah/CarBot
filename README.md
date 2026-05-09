@@ -156,7 +156,7 @@ npm install
 cd functions && npm install && cd ..
 ```
 
-CarBot depends on VoiceCommon and KnowledgeCommon as local packages (`file:../VoiceCommon`, `file:../knowledgecommon`). Clone both alongside CarBot so the paths resolve:
+CarBot depends on VoiceCommon and KnowledgeCommon as local packages (`file:../voicecommon`, `file:../knowledgecommon`). Clone both alongside CarBot so the paths resolve:
 
 ```bash
 # In the parent directory:
