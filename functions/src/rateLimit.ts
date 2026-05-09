@@ -29,6 +29,10 @@ export const RATE_LIMITS = {
   mintGeminiLiveToken: 200,
   invokeGemini: 1000,
   embedGemini: 500,
+  // reconcileMemories runs Gemini extraction on up to 100 sessions per
+  // invocation. Five runs/day = 500 extractions/day max — enough for
+  // legitimate use, low enough to bound cost if a UI bug causes a loop.
+  reconcileMemories: 5,
 } as const;
 
 export type RateLimitBucket = keyof typeof RATE_LIMITS;

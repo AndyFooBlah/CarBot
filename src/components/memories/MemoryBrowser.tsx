@@ -23,6 +23,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@andyfooblah/voice-common';
 import { getMemories, updateMemory, deleteMemory } from '../../services/memories';
+import { reconcileMemories, summarizeReconcileResult } from '../../services/memoriesReconcile';
 import type { Memory, MemoryCategory } from '../../types';
 
 const CATEGORIES: MemoryCategory[] = ['interest', 'event', 'plan', 'fact', 'preference', 'relationship', 'other'];
@@ -132,6 +133,8 @@ export function MemoryBrowser() {
   const [loading, setLoading] = useState(true);
   const [filterCategory, setFilterCategory] = useState<MemoryCategory | 'all'>('all');
   const [error, setError] = useState<string | null>(null);
+  const [reconciling, setReconciling] = useState(false);
+  const [reconcileMessage, setReconcileMessage] = useState<string | null>(null);
 
   const load = () => {
     if (!user) return;
@@ -155,12 +158,58 @@ export function MemoryBrowser() {
     load();
   };
 
+  const handleReconcile = async () => {
+    setReconciling(true);
+    setReconcileMessage(null);
+    setError(null);
+    try {
+      const result = await reconcileMemories();
+      setReconcileMessage(summarizeReconcileResult(result));
+      // Refresh the memories list so newly-extracted items show up.
+      load();
+    } catch (err) {
+      const code = (err as { code?: string })?.code ?? '';
+      const message = (err as { message?: string })?.message ?? String(err);
+      if (code === 'functions/resource-exhausted') {
+        setError("Reconcile is rate-limited (5 runs/day). Try again tomorrow.");
+      } else {
+        setError(`Reconcile failed: ${message}`);
+      }
+    } finally {
+      setReconciling(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Memories</h1>
-        <p className="text-sm text-slate-500 mt-0.5">Facts CarBot has learned about your family</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Memories</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Facts CarBot has learned about your family</p>
+        </div>
+        <button
+          onClick={handleReconcile}
+          disabled={reconciling}
+          title="Scan all your recent sessions for memories that haven't been extracted yet."
+          className="text-sm px-3 py-1.5 rounded-lg font-medium transition-colors bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          {reconciling ? (
+            <>
+              <span className="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+              Reconciling…
+            </>
+          ) : (
+            'Reconcile memories'
+          )}
+        </button>
       </div>
+
+      {reconcileMessage && (
+        <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-800">
+          {reconcileMessage}
+          <button onClick={() => setReconcileMessage(null)} className="ml-2 font-bold">×</button>
+        </div>
+      )}
 
       {error && (
         <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">

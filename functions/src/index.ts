@@ -53,6 +53,7 @@ import {
 
 export { geoProxy } from './geoProxy';
 export { cacheWikipediaArticle } from './cacheWikipedia';
+export { reconcileMemories } from './reconcileMemories';
 
 export const mintGeminiLiveToken = onCall(
   { secrets: [geminiApiKey], timeoutSeconds: 30, region: 'us-central1' },
