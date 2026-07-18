@@ -8,8 +8,9 @@ on:
 
 # CarBot consumes @andyfooblah/voice-common and @andyfooblah/knowledge-common
 # via `file:../voicecommon` and `file:../knowledgecommon` paths. In CI we
-# check out the peer repos as siblings so those paths resolve. A PAT with
-# contents:read on the peer repos must be stored as `PEER_REPO_TOKEN`.
+# check out the peer repos as siblings so those paths resolve. Both peer
+# repos are public, so no token is needed — this also lets CI run on
+# forked pull requests (a repo secret would be unavailable to forks).
 jobs:
   # ---------------------------------------------------------------------------
   # Frontend: type-check, lint, test
@@ -28,14 +29,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: andyfooblah/VoiceCommon
-          token: ${{ secrets.PEER_REPO_TOKEN }}
           path: voicecommon
 
       - name: Check out KnowledgeCommon
         uses: actions/checkout@v4
         with:
           repository: andyfooblah/KnowledgeCommon
-          token: ${{ secrets.PEER_REPO_TOKEN }}
           path: knowledgecommon
 
       - name: Set up Node.js
