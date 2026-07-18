@@ -420,7 +420,7 @@ Gmail API credentials (OAuth2 refresh token or service account key) are stored a
 
 VoiceCommon's `useSession` is wired up via the `tokenProvider` option of `initializeVoiceCommon` (see `src/index.tsx`), so the library asks CarBot for an ephemeral token before opening the Live WebSocket and never sees the long-lived key. The previous design — passing `geminiApiKey` straight to `initializeVoiceCommon` — has been removed; that pattern repeated the prior incident (key bundled in JS, harvested, abused).
 
-**Open gap (TODO K1):** KnowledgeCommon (Wikipedia RAG, date-time tools) still calls Gemini directly from the browser using a key passed via `initializeKnowledgeCommon({ geminiApiKey })`. Until KnowledgeCommon supports a tokenProvider, `VITE_GEMINI_API_KEY` remains in CarBot's bundle for those tools' use. See DEPLOYMENT.md for the residual mitigations (HTTP referrer + API restrictions in GCP Console).
+**K1 — resolved.** KnowledgeCommon (Wikipedia RAG, date-time tools) now receives `{ invokeGemini, embedContent: embedGemini }` via `initializeKnowledgeCommon`, routing all of its Gemini calls through the same server-side brokers. No Gemini key exists in the client bundle; the ESLint `VITE_GEMINI_*` guard and the post-build bundle scanner enforce this on every build.
 
 ---
 

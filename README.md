@@ -57,8 +57,8 @@ Built on [`@andyfooblah/voice-common`](https://github.com/AndyFooBlah/VoiceCommo
 | Frontend framework | React 19, TypeScript, Vite, Tailwind CSS v4 |
 | Voice AI framework | [`@andyfooblah/voice-common`](https://github.com/AndyFooBlah/VoiceCommon) v0.6.0+ |
 | Knowledge tools | [`@andyfooblah/knowledge-common`](https://github.com/AndyFooBlah/KnowledgeCommon) v1.0.0+ |
-| Voice model | Google Gemini Live (`gemini-2.5-flash-preview-native-audio-dialog`) |
-| Post-processing AI | Google Gemini 2.0 Flash |
+| Voice model | Google Gemini Live (`gemini-3.1-flash-live-preview`) |
+| Post-processing AI | Google Gemini 3 / 3.1 Flash family (`gemini-3-flash-preview`, `gemini-3.1-flash-lite-preview`); embeddings via `gemini-embedding-001` |
 | Auth | Firebase Authentication (Google OAuth + email/password) |
 | Database | Cloud Firestore |
 | Storage | Firebase Cloud Storage |
@@ -93,7 +93,7 @@ carbot/
 │   │   ├── transcriptEditor.ts   # Versioned transcript edits
 │   │   ├── tripContext.ts        # Trip context inference from schedule
 │   │   └── userProfile.ts        # User profile Firestore helpers
-│   ├── __tests__/                # Vitest unit tests (87 tests)
+│   ├── __tests__/                # Vitest unit tests (99 tests)
 │   └── types.ts                  # CarBot-specific TypeScript types
 ├── functions/
 │   └── src/
@@ -127,7 +127,9 @@ All documents include a `userId` field matching the Firebase Auth UID of the own
 | `memories/{memoryId}` | Cross-session memory index (fan-out from session memories) |
 | `context_documents/{docId}` | User-supplied context (uploaded files, forwarded emails, pasted text) |
 | `emails/{emailId}` | Emails ingested from CarBot's Gmail inbox |
+| `wikipedia_cache/{articleId}` | Shared Wikipedia RAG cache (KnowledgeCommon); read-only to clients, written server-side to prevent cache poisoning |
 | `system/gmailPollingState` | Internal polling state (historyId) — no client access |
+| `_usage/{uid}` | Per-user daily voice-quota counters — Cloud Functions only, no client access |
 
 ### Key design decisions
 
@@ -291,7 +293,7 @@ npm run deploy
 npm test
 ```
 
-Tests use Vitest with jsdom. Firebase and VoiceCommon are fully mocked — no emulator or network connection needed. 87 tests across:
+Tests use Vitest with jsdom. Firebase and VoiceCommon are fully mocked — no emulator or network connection needed. 99 tests across:
 
 - `instructionBuilder.test.ts` — system instruction assembly (bot name, child name, location, tools, graceful error handling)
 - `tripContext.test.ts` — trip context inference logic (pure functions)
@@ -332,7 +334,7 @@ Configure your routine under **Settings → Schedule**.
 
 ## How memory works
 
-After each session, a Cloud Function calls Gemini 2.0 Flash to extract structured facts from the transcript. Facts are stored in two places:
+After each session, a Cloud Function calls Gemini 3 Flash to extract structured facts from the transcript. Facts are stored in two places:
 
 1. `sessions/{id}/memories/facts` — session-level source of truth
 2. `memories/{memoryId}` — cross-session index for fast retrieval

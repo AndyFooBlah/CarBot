@@ -18,12 +18,17 @@ A leaked ephemeral token expires in 30 minutes; a leaked invoke call is
 bounded by the model allow-list and per-user quota. Either is a much
 smaller blast radius than a leaked long-lived key.
 
-**Open gap (TODO K1):** `KnowledgeCommon` — used here for Wikipedia RAG and
-date-time tools — still calls Gemini directly from the browser using the
-key passed via `initializeKnowledgeCommon({ geminiApiKey })`. Until
-KnowledgeCommon gains broker support, `VITE_GEMINI_API_KEY` is still
-present in CarBot's bundle for those tools' use only. Mitigations below
-still apply to that residual key.
+**K1 — resolved.** KnowledgeCommon (Wikipedia RAG, date-time tools) is
+now wired through the same server-side brokers as everything else:
+CarBot passes `{ invokeGemini, embedContent: embedGemini }` into
+`initializeKnowledgeCommon`, so the library never holds a key. There is
+no `VITE_GEMINI_API_KEY` anywhere in the project and no Gemini key in
+the client bundle. Two automated guards keep it that way: the ESLint
+`no-restricted-syntax` rule on `VITE_GEMINI_*` reads, and the
+post-build bundle scanner (`scripts/check-bundle-for-secrets.mjs`),
+which fails the build on any key-shaped string in `dist/` other than
+the allowlisted Firebase web `apiKey` (a project identifier, not a
+secret — access control lives in Firestore/Storage rules).
 
 ### 1. Gemini secret on the server
 
@@ -37,18 +42,17 @@ Both `mintGeminiLiveToken` and `invokeGemini` declare `secrets:
 [geminiApiKey]` so they automatically receive the latest version on the
 next deploy of `firebase deploy --only functions`.
 
-### 2. Residual client-bundle Gemini key (KnowledgeCommon)
+### 2. Old client-side key cleanup (one-time, post-K1)
 
-Until K1 ships, GCP Console → APIs & Services → Credentials → the key
-passed via `VITE_GEMINI_API_KEY`:
+The pre-K1 architecture shipped a referrer-restricted Gemini key in the
+bundle (`VITE_GEMINI_API_KEY`). That key is no longer used anywhere.
+One-time cleanup in GCP Console → APIs & Services → Credentials:
 
-- **Application restrictions**: HTTP referrers.
-  - `https://carbot-andybrook.web.app/*`
-  - `https://carbot-andybrook.firebaseapp.com/*`
-  - `http://localhost:3004/*` (only during active dev; remove before rotating)
-- **API restrictions**: restrict to "Generative Language API" only.
-- **Quotas**: confirm per-day caps on "Generate Content Requests" are
-  low enough that a leak can't drain the project budget before you notice.
+- Confirm the old client-side key has been **deleted** (not just
+  restricted). If any deployed bundle from before the broker migration
+  is still cached anywhere, deletion is what makes it inert.
+- The only browser-visible key should now be the Firebase web `apiKey`;
+  keep its API restrictions scoped to the Firebase services in use.
 
 ### 3. Maps API key — server-side only
 
@@ -71,9 +75,10 @@ After hosting deploy:
 3. Start a voice session; verify it connects.
 4. Verify geo lookups work (ask the bot "where am I?" — it should
    reverse-geocode successfully).
-5. From a browser on a different domain, paste the residual
-   `VITE_GEMINI_API_KEY` into a Gemini API cURL — it should return `403`
-   (referrer restrictions are in effect).
+5. Confirm the bundle is key-free: the build already fails on any
+   key-shaped string via `scripts/check-bundle-for-secrets.mjs`, but a
+   manual `grep -R "AIza" dist/` should match only the Firebase web
+   `apiKey`.
 
 ### 5. Rotating the keys
 
@@ -83,8 +88,5 @@ After hosting deploy:
 3. `firebase deploy --only functions` to redeploy with the new secret.
 4. Delete the old key in GCP Console.
 
-**Client-side `VITE_GEMINI_API_KEY`** (residual, KnowledgeCommon only —
-will go away with K1):
-1. Mint a new key in GCP Console with the restrictions above pre-applied.
-2. Update `.env.production` locally, rebuild, redeploy hosting.
-3. Delete the old key in GCP Console.
+There is no client-side Gemini key to rotate — the browser only ever
+holds single-use ephemeral tokens minted by `mintGeminiLiveToken`.

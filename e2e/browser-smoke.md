@@ -4,7 +4,9 @@ Operator-driven read-only smoke test. An agent (Claude via `claude-in-chrome`)
 navigates each route, runs `e2e/probe.js` to capture page shape + console
 errors, and reports failures. No writes, no data modifications.
 
-**Target**: https://carbot-andybrook.web.app
+**Target**: the deployed hosting URL (default `$CARBOT_URL`, else the
+project's `*.web.app`). Substitute your own project's hosting URL when
+running against a fork.
 **Precondition**: user is already signed in in the active Chrome tab.
 
 ## Run it
@@ -26,7 +28,7 @@ errors, and reports failures. No writes, no data modifications.
 
 | # | URL | Expect | Notes |
 |---|-----|--------|-------|
-| 1 | `/` | redirects to `/sessions` (final URL contains `/sessions`) | Top-level redirect. |
+| 1 | `/` | Home landing page renders (heading/hero visible); nav links to the app sections present. | Home. Does NOT redirect to `/sessions` anymore. |
 | 2 | `/sessions` | nav contains `Sessions`/`Context`/`Memories`/`Settings`/`Diagnostics`; page shows a list of sessions or empty-state. | SessionList. Capture `$sessionId` from first session card link. |
 | 3 | `/context` | heading mentions `Context` or `Library`; list of documents or empty state. | ContextLibrary. |
 | 4 | `/memories` | heading mentions `Memories`; list of memory entries or empty state. | MemoryBrowser. |
