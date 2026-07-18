@@ -24,12 +24,26 @@
  *   2. Fetch messages newer than the last-seen historyId stored in Firestore
  *      (or all unread messages on first run).
  *   3. For each message:
- *        a. Look up the sender's email in `users` collection.
- *        b. If found and user has email ingestion enabled, decode and store
- *           the email body in `emails/{emailId}`.
- *        c. Create or update a context document in `context_documents/{docId}`
+ *        a. Verify the message passed DMARC (per Gmail's own
+ *           Authentication-Results verdict) — rejects From-header spoofing.
+ *        b. Look up the sender's email in `users` collection. Registration
+ *           is the only per-user gate; there is no separate opt-in flag.
+ *        c. If both checks pass, decode and store the email body in
+ *           `emails/{emailId}`.
+ *        d. Create or update a context document in `context_documents/{docId}`
  *           linked to the ingested email.
  *   4. Update the stored historyId so next run only fetches new messages.
+ *
+ * Trust model: attribution = DMARC-authenticated From address matched
+ * against a registered user's email. Gmail has already evaluated
+ * SPF/DKIM/DMARC on receipt; we read its verdict from the topmost
+ * Authentication-Results header rather than re-verifying signatures
+ * ourselves. Messages failing DMARC are dropped (marked read) — a spoofed
+ * From: of a registered parent must not become a context document in a
+ * kid-facing bot. Senders on domains with no DMARC policy will fail this
+ * gate; all major consumer providers (Gmail, iCloud, Outlook, Yahoo)
+ * publish one, so in practice this only excludes unauthenticated
+ * bulk/spoofed mail.
  *
  * Setup required (same secrets as sessionSummaryEmail):
  *   GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN,
@@ -112,6 +126,52 @@ function getHeader(
   name: string,
 ): string {
   return headers?.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? '';
+}
+
+/**
+ * Mask an email address for logging: keep the first character of the
+ * local part and the domain, hide the rest. "parent@example.com" →
+ * "p***@example.com". Never returns the full local part, so log
+ * aggregation systems don't accumulate raw addresses (issue #27).
+ */
+export function maskEmail(email: string): string {
+  const at = email.indexOf('@');
+  if (at <= 0) return '***';
+  return `${email[0]}***${email.slice(at)}`;
+}
+
+/**
+ * True if Gmail's own DMARC evaluation of this message passed.
+ *
+ * Gmail runs SPF/DKIM/DMARC on every inbound message and records the
+ * verdict in an Authentication-Results header with its authserv-id
+ * ("mx.google.com"). We trust ONLY headers bearing that authserv-id —
+ * a sender can inject their own forged Authentication-Results header,
+ * but cannot forge one that Gmail prepends on receipt; per RFC 8601
+ * the topmost matching header is the receiving server's own.
+ *
+ * DMARC (not bare SPF/DKIM) is the correct check here because it is
+ * the alignment test: it requires the *visible From: domain* to match
+ * what SPF/DKIM actually authenticated — which is precisely the
+ * spoofing gap in From-header-based attribution.
+ *
+ * Note: we cannot rely on Gmail having spam-foldered DMARC failures.
+ * gmail.com itself publishes p=none, so a spoofed @gmail.com From can
+ * land in INBOX — but the dmarc=fail verdict is still recorded in the
+ * header, which is what we check.
+ */
+export function dmarcPasses(
+  headers: Array<{ name?: string; value?: string }> | undefined,
+): boolean {
+  const authResults = (headers ?? [])
+    .filter((h) => h.name?.toLowerCase() === 'authentication-results')
+    .map((h) => h.value ?? '');
+  // Topmost header whose authserv-id is Gmail's own.
+  const googleVerdict = authResults.find((v) =>
+    v.trim().toLowerCase().startsWith('mx.google.com'),
+  );
+  if (!googleVerdict) return false;
+  return /(?:^|;)\s*dmarc=pass\b/i.test(googleVerdict);
 }
 
 /**
@@ -228,14 +288,31 @@ export async function ingestEmails(): Promise<void> {
       const fromEmail = fromEmailMatch?.[1]?.toLowerCase() ?? '';
 
       if (!fromEmail) {
-        console.log(`[emailIngestion] Could not parse sender from: ${from}`);
+        // Don't log the raw From header — it can carry a display name (PII).
+        console.log(`[emailIngestion] Could not parse sender for message ${messageId}`);
+        continue;
+      }
+
+      // DMARC gate: only accept messages Gmail itself verified as
+      // authentically from the claimed From: domain. Without this, a
+      // spoofed From: of a registered parent's address would be enough
+      // to inject a context document into the family's sessions.
+      if (!dmarcPasses(headers)) {
+        console.warn(
+          `[emailIngestion] DMARC failed for message ${messageId} from ${maskEmail(fromEmail)} — dropping`,
+        );
+        await gmail.users.messages.modify({
+          userId: 'me',
+          id: messageId,
+          requestBody: { removeLabelIds: ['UNREAD'] },
+        });
         continue;
       }
 
       // Check if sender is a registered user
       const userId = emailToUserId[fromEmail];
       if (!userId) {
-        console.log(`[emailIngestion] Unknown sender, skipping: ${fromEmail}`);
+        console.log(`[emailIngestion] Unknown sender, skipping: ${maskEmail(fromEmail)}`);
         // Mark as read so we don't reprocess
         await gmail.users.messages.modify({
           userId: 'me',
@@ -307,7 +384,9 @@ export async function ingestEmails(): Promise<void> {
         batchCount = 0;
       }
 
-      console.log(`[emailIngestion] Ingested email "${subject}" from ${fromEmail} → user ${userId}`);
+      // No subject (sender-authored PII) and masked sender in logs (#27);
+      // userId is kept for trace correlation.
+      console.log(`[emailIngestion] Ingested email ${messageId} from ${maskEmail(fromEmail)} → user ${userId}`);
     } catch (err) {
       console.error(`[emailIngestion] Failed to process message ${messageId}:`, err);
     }

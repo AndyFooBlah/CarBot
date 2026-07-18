@@ -56,11 +56,24 @@ service cloud.firestore {
     // Users can only access their own sessions.
     match /sessions/{sessionId} {
       allow read: if isAuth() && resource.data.userId == request.auth.uid;
-      allow create: if isAuth() && incomingUserIdMatches();
-      // Updates allowed only by the session owner; status can only advance
-      // (active → completed | interrupted), never go backward to active.
+      // Create: exactly the fields VoiceCommon's createSession writes —
+      // no client-invented fields at document birth (#28).
+      allow create: if isAuth() && incomingUserIdMatches()
+        && request.resource.data.keys().hasOnly(
+          ['userId', 'startTime', 'endTime', 'audioUrl', 'status',
+           'durationSeconds']);
+      // Update: owner only, and only the fields the sanctioned client
+      // writers touch — VoiceCommon finalizeSession (endTime, status,
+      // durationSeconds, audioUrl), VoiceCommon's metrics write
+      // (sessionMetrics), and CarBot setSessionCarbotFields (tripContext,
+      // contextDocIds, summary). Everything else — including userId, so a
+      // session can never be reassigned to another user — is frozen (#28).
+      // status is limited to known values when present.
       allow update: if isAuth()
         && resource.data.userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          ['status', 'endTime', 'durationSeconds', 'audioUrl',
+           'sessionMetrics', 'tripContext', 'contextDocIds', 'summary'])
         && (
           !has('status') ||
           request.resource.data.status in ['completed', 'interrupted', 'active']

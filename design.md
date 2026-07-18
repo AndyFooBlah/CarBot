@@ -303,17 +303,22 @@ Speaker labels use child's name if configured in user profile; otherwise generic
 
 Architecture: A scheduled Cloud Function runs every 15 minutes (or can be manually triggered):
 
-1. Authenticate with Gmail API using a service account / OAuth2 credentials stored in Cloud Function secrets
-2. Query Gmail for unread messages sent to CarBot's address
-3. For each unread message:
-   - Check `emails` collection for `gmailMessageId` (deduplication)
-   - Parse `from`, `subject`, `receivedAt`, plain-text body
-   - Write to `emails/{emailId}`
+1. Authenticate with Gmail API using OAuth2 credentials stored in Cloud Function secrets
+2. Fetch new messages incrementally via the Gmail history API (falls back to a full unread fetch when the stored historyId expires)
+3. For each new message:
+   - **DMARC gate**: read Gmail's own `Authentication-Results` verdict (topmost header with authserv-id `mx.google.com`) and require `dmarc=pass`. Messages failing DMARC are dropped (marked read, never ingested) — a spoofed `From:` of a registered parent must not become a context document in a kid-facing bot.
+   - **Registered-sender gate**: parse the sender address from `From:` and require it to match a registered user's email in the `users` collection. Unknown senders are dropped (marked read).
+   - Parse `subject`, `receivedAt`, plain-text body (multipart-aware, HTML fallback; body capped at 10,000 chars)
+   - Write to `emails/{emailId}` (keyed by `gmailMessageId` for deduplication)
    - Write parsed content to `context_documents/{docId}` with `source: 'email'`, `active: true`
    - Mark email as read in Gmail
-4. Emit one Firestore write per email; Cloud Function exits
+4. Update the stored historyId; Cloud Function exits
 
-The CarBot Gmail address is a hardcoded constant in Cloud Function config. Emails from any sender are ingested (the user controls who has the address).
+**Trust model:** attribution = DMARC-authenticated `From:` address matched against a registered user's email. Gmail evaluates SPF/DKIM/DMARC on receipt; the function reads that verdict rather than re-verifying signatures. Senders on domains with no DMARC policy fail the gate — all major consumer providers publish one, so in practice this excludes only unauthenticated or spoofed mail. There is no per-user opt-out flag; registration is the only per-user gate.
+
+**Logging hygiene:** log lines never include the email subject or full sender address — sender is masked (`p***@example.com`) and `userId` is kept for trace correlation.
+
+The CarBot Gmail address is a hardcoded constant in Cloud Function config.
 
 ### 4.6 Gmail Integration — Outbound (Session Summaries)
 
