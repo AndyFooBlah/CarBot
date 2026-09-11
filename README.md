@@ -56,7 +56,7 @@ Built on [`@andyfooblah/voice-common`](https://github.com/AndyFooBlah/VoiceCommo
 |---|---|
 | Frontend framework | React 19, TypeScript, Vite, Tailwind CSS v4 |
 | Voice AI framework | [`@andyfooblah/voice-common`](https://github.com/AndyFooBlah/VoiceCommon) v0.14+ (npm) |
-| Knowledge tools | [`@andyfooblah/knowledge-common`](https://github.com/AndyFooBlah/KnowledgeCommon) v1.2+ (npm) |
+| Knowledge tools | [`@andyfooblah/knowledge-common`](https://github.com/AndyFooBlah/KnowledgeCommon) v1.3+ (npm) |
 | Voice model | Google Gemini Live (`gemini-3.1-flash-live-preview`) |
 | Post-processing AI | Google Gemini stable Flash family (`gemini-3.8-flash` for memory extraction / summaries / schedule parsing, `gemini-3.5-flash-lite` for clean transcripts — IDs live in `functions/src/models.ts`); embeddings via `gemini-embedding-001` |
 | Auth | Firebase Authentication (Google OAuth + email/password) |
