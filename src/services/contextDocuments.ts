@@ -34,6 +34,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@andyfooblah/voice-common';
 import type { ContextDocument, ContextDocumentSource } from '../types';
+import { sanitizeInline, stripControlChars, MAX_CONTEXT_DOC_SECTION_CHARS } from './promptSafety';
 
 /** Maximum content length stored in Firestore (50,000 chars). */
 export const MAX_CONTENT_LENGTH = 50_000;
@@ -121,16 +122,32 @@ export async function getActiveContextDocuments(userId: string): Promise<Context
 export function buildContextDocumentSection(docs: ContextDocument[]): string | null {
   if (docs.length === 0) return null;
 
-  const sections = docs.map((d) => {
-    const header = `[${d.title}]`;
+  // Per-doc cap (INSTRUCTION_INLINE_LIMIT) plus a total cap on the section so
+  // an unbounded number of active docs cannot crowd out the rest of the
+  // prompt (#33). Titles and bodies are stripped of control characters.
+  const sections: string[] = [];
+  let used = 0;
+  let omitted = 0;
+  for (const d of docs) {
+    const header = `[${sanitizeInline(d.title, 120) || 'Untitled'}]`;
+    const content = stripControlChars(d.content);
     const body =
-      d.content.length <= INSTRUCTION_INLINE_LIMIT
-        ? d.content
-        : d.content.slice(0, INSTRUCTION_INLINE_LIMIT) + '\n[...truncated]';
-    return `${header}\n${body}`;
-  });
+      content.length <= INSTRUCTION_INLINE_LIMIT
+        ? content
+        : content.slice(0, INSTRUCTION_INLINE_LIMIT) + '\n[...truncated]';
+    const section = `${header}\n${body}`;
+    if (used + section.length > MAX_CONTEXT_DOC_SECTION_CHARS) {
+      omitted++;
+      continue;
+    }
+    sections.push(section);
+    used += section.length;
+  }
+  if (omitted > 0) {
+    sections.push(`[...${omitted} more document${omitted === 1 ? '' : 's'} omitted — too much context]`);
+  }
 
-  return `Context documents provided by the user:\n\n${sections.join('\n\n---\n\n')}`;
+  return `Context documents supplied by the parent (reference information):\n\n${sections.join('\n\n---\n\n')}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -175,12 +192,32 @@ export async function updateContextDocument(
   });
 }
 
-/** Toggle the active state of a context document. */
+/**
+ * Toggle the active state of a context document. Touching the toggle counts
+ * as the parent having reviewed the document (see needsReview).
+ */
 export async function setContextDocumentActive(docId: string, active: boolean): Promise<void> {
   await updateDoc(doc(db, 'context_documents', docId), {
     active,
+    reviewedAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
   });
+}
+
+/**
+ * Mark a document as reviewed without changing its active state. Used for
+ * email-sourced documents, which arrive inactive (#33) so third-party text
+ * never reaches the child's prompt until a parent has looked at it.
+ */
+export async function markContextDocumentReviewed(docId: string): Promise<void> {
+  await updateDoc(doc(db, 'context_documents', docId), {
+    reviewedAt: Timestamp.now(),
+  });
+}
+
+/** True for an email-sourced document a parent has not yet activated or reviewed. */
+export function needsReview(d: Pick<ContextDocument, 'source' | 'active' | 'reviewedAt'>): boolean {
+  return d.source === 'email' && !d.active && !d.reviewedAt;
 }
 
 /** Hard-delete a context document. */

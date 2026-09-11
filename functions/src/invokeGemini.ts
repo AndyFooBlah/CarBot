@@ -33,6 +33,7 @@ import { HttpsError, CallableRequest } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
 import { enforceRateLimit } from './rateLimit';
 import { FLASH_MODEL, FLASH_LITE_MODEL } from './models';
+import { KID_SAFETY_SETTINGS } from './safety';
 
 /**
  * Models the client is allowed to invoke through the proxy. Keep this tight
@@ -85,6 +86,9 @@ export function buildInvokeGeminiHandler(deps: {
     }
 
     const safeConfig = { ...(config ?? {}) } as Record<string, unknown>;
+    // Child-facing product: the strictest safety settings are enforced here
+    // for every proxied call — a client cannot loosen them (#33).
+    safeConfig.safetySettings = [...KID_SAFETY_SETTINGS];
     if (
       typeof safeConfig.maxOutputTokens === 'number' &&
       safeConfig.maxOutputTokens > MAX_OUTPUT_TOKENS_CEILING

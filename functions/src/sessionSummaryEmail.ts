@@ -40,6 +40,7 @@ import { google } from 'googleapis';
 import { defineSecret } from 'firebase-functions/params';
 import { geminiApiKey } from './memoryExtraction';
 import { FLASH_MODEL } from './models';
+import { KID_SAFETY_SETTINGS } from './safety';
 import type { SessionDocument, UserDocument, TranscriptEntry } from './types';
 
 export const gmailClientId = defineSecret('GMAIL_CLIENT_ID');
@@ -172,6 +173,7 @@ export async function sendSessionSummaryEmail(sessionId: string): Promise<void> 
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { temperature: 0.5, maxOutputTokens: 1024 },
+          safetySettings: KID_SAFETY_SETTINGS,
         }),
       },
     );

@@ -350,7 +350,10 @@ export async function ingestEmails(): Promise<void> {
         body,
       });
 
-      // Create a context document linked to this email
+      // Create a context document linked to this email. It arrives INACTIVE
+      // (#33): forwarded email is third-party text and must not reach the
+      // child's prompt until a parent has reviewed it in the Context page,
+      // where it shows up under "new documents to review".
       const title = titleFromSubject(subject);
       const ctxRef = db.collection('context_documents').doc();
       batch.set(ctxRef, {
@@ -360,7 +363,7 @@ export async function ingestEmails(): Promise<void> {
         source: 'email',
         content: body,
         tags: ['email'],
-        active: true,
+        active: false,
         createdAt: now,
         updatedAt: now,
         emailId: messageId,

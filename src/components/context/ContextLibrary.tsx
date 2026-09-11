@@ -27,6 +27,8 @@ import {
   updateContextDocument,
   setContextDocumentActive,
   deleteContextDocument,
+  markContextDocumentReviewed,
+  needsReview,
   extractTextFromPdf,
   validateContextUpload,
   MAX_CONTENT_LENGTH,
@@ -44,15 +46,19 @@ function DocCard({
   onToggleActive,
   onDelete,
   onEdit,
+  onMarkReviewed,
 }: {
   doc: ContextDocument;
   onToggleActive: () => void;
   onDelete: () => void;
   onEdit: () => void;
+  onMarkReviewed: () => void;
 }) {
   const date = d.updatedAt?.toDate?.()?.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const review = needsReview(d);
+  const border = review ? 'border-amber-300 bg-amber-50/40' : d.active ? 'border-blue-200' : 'border-slate-200 opacity-70';
   return (
-    <div className={`bg-white border rounded-xl p-4 transition-all ${d.active ? 'border-blue-200' : 'border-slate-200 opacity-70'}`}>
+    <div className={`bg-white border rounded-xl p-4 transition-all ${border}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -60,6 +66,11 @@ function DocCard({
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${SOURCE_BADGE[d.source] ?? 'bg-slate-100 text-slate-600'}`}>
               {d.source}
             </span>
+            {review && (
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-800" title="Forwarded emails stay off until you review them">
+                new — review before CarBot can use it
+              </span>
+            )}
           </div>
           <p className="text-xs text-slate-500 mt-0.5">{date} · {d.content.length.toLocaleString()} chars</p>
           {d.tags.length > 0 && (
@@ -79,6 +90,9 @@ function DocCard({
           >
             <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${d.active ? 'translate-x-4' : 'translate-x-0.5'}`} />
           </button>
+          {review && (
+            <button onClick={onMarkReviewed} className="text-xs text-amber-700 hover:text-amber-900 px-2 py-1 rounded hover:bg-amber-100" title="Keep it off, but stop flagging it as new">Mark reviewed</button>
+          )}
           <button onClick={onEdit} className="text-xs text-slate-500 hover:text-slate-800 px-2 py-1 rounded hover:bg-slate-100">Edit</button>
           <button onClick={onDelete} className="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50">Delete</button>
         </div>
@@ -180,6 +194,11 @@ export function ContextLibrary() {
     load();
   };
 
+  const handleMarkReviewed = async (d: ContextDocument) => {
+    await markContextDocumentReviewed(d.id).catch((err) => setError(String(err)));
+    load();
+  };
+
   const openEdit = (d: ContextDocument) => {
     setEditingDoc(d);
     setEditTitle(d.title);
@@ -203,13 +222,24 @@ export function ContextLibrary() {
   };
 
   const activeCount = docs.filter((d) => d.active).length;
+  const reviewCount = docs.filter(needsReview).length;
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Context Library</h1>
-          <p className="text-sm text-slate-500 mt-0.5">{activeCount} active document{activeCount !== 1 ? 's' : ''} will be included in your next session</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-2xl font-bold text-slate-900">Context Library</h1>
+            {reviewCount > 0 && (
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800" data-testid="review-badge">
+                {reviewCount} new document{reviewCount !== 1 ? 's' : ''} to review
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-slate-500 mt-0.5">
+            {activeCount} active document{activeCount !== 1 ? 's' : ''} will be included in your next session
+            {reviewCount > 0 && ' · forwarded emails stay off until you turn them on'}
+          </p>
         </div>
         <button
           onClick={() => setShowAdd(true)}
@@ -343,6 +373,7 @@ export function ContextLibrary() {
               onToggleActive={() => handleToggleActive(d)}
               onDelete={() => handleDelete(d.id)}
               onEdit={() => openEdit(d)}
+              onMarkReviewed={() => handleMarkReviewed(d)}
             />
           ))}
         </div>

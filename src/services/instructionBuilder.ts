@@ -22,6 +22,13 @@
  *   4. Recent memory facts from past conversations
  *   5. Active context documents (teacher notes, etc.)
  *   6. Recent session summaries
+ *   7. Tool instructions
+ *   8. The non-negotiable SAFETY block — always LAST so it overrides the
+ *      persona and anything injected from documents / emails / memories (#33)
+ *
+ * Third-party text (memories, context documents) is wrapped in explicit
+ * UNTRUSTED markers and size-capped; user-typed names are sanitized. See
+ * promptSafety.ts.
  *
  * The assembled instruction targets ≤ 8000 tokens (~32,000 characters).
  * Content is prioritized: persona + context → memories → docs → summaries.
@@ -32,6 +39,15 @@ import { getActiveContextDocuments, buildContextDocumentSection } from './contex
 import { inferTripContext, tripContextToDescription, getDayScheduleSummary } from './tripContext';
 import { getRecentSessionTimestamps } from './sessions';
 import { proxyReverseGeocodeCity } from './geoProxy';
+import {
+  SAFETY_BLOCK,
+  sanitizeName,
+  sanitizeInline,
+  wrapUntrusted,
+  capSection,
+  MAX_MEMORY_SECTION_CHARS,
+  MAX_CONTEXT_DOC_SECTION_CHARS,
+} from './promptSafety';
 import type { CarbotUserProfile, TripContext } from '../types';
 
 export interface SessionContext {
@@ -57,11 +73,11 @@ export interface SessionContext {
  */
 export async function buildCarbotInstruction(context: SessionContext): Promise<string> {
   const { userId, profile, currentCity, tripContext, now } = context;
-  const childName = profile.childName ?? 'the child';
+  // User-typed identifiers: strip control chars, collapse whitespace, cap length.
+  const childName = sanitizeName(profile.childName, 'the child');
+  const botName = sanitizeName(profile.botName, 'CarBot');
 
   const parts: string[] = [];
-
-  const botName = profile.botName?.trim() || 'CarBot';
 
   // --- 1. Base persona ---
   parts.push(`Your name is ${botName}. You are a warm, curious, and entertaining AI companion for car rides.
@@ -114,7 +130,7 @@ Vary your phrasing each session — don't repeat the same opening. Do not exceed
 
   if (profile.locations && profile.locations.length > 0) {
     const locationList = profile.locations
-      .map((l) => `${l.name} (${l.resolvedAddress})`)
+      .map((l) => `${sanitizeInline(l.name, 60)} (${sanitizeInline(l.resolvedAddress)})`)
       .join(', ');
     parts.push(`Known locations: ${locationList}.`);
   }
@@ -133,7 +149,9 @@ Vary your phrasing each session — don't repeat the same opening. Do not exceed
   try {
     const memoryContext = await getMemoryContextString(userId, 20);
     if (memoryContext) {
-      parts.push(memoryContext);
+      // LLM-extracted from the family's own speech — third-party text as far
+      // as the prompt is concerned. Delimit + cap.
+      parts.push(wrapUntrusted('MEMORIES', capSection(memoryContext, MAX_MEMORY_SECTION_CHARS)));
     }
   } catch (err) {
     console.error('[instructionBuilder] Failed to load memories:', err);
@@ -144,7 +162,8 @@ Vary your phrasing each session — don't repeat the same opening. Do not exceed
     const activeDocs = await getActiveContextDocuments(userId);
     const docSection = buildContextDocumentSection(activeDocs);
     if (docSection) {
-      parts.push(docSection);
+      // Uploaded files / pasted text / forwarded emails. Delimit + cap.
+      parts.push(wrapUntrusted('CONTEXT DOCUMENTS', capSection(docSection, MAX_CONTEXT_DOC_SECTION_CHARS)));
     }
   } catch (err) {
     console.error('[instructionBuilder] Failed to load context documents:', err);
@@ -165,6 +184,9 @@ MATH-GAME TOOLS — for when the user (especially a school-aged kid) wants a qui
 - 'generateMathProblem' returns a 2-digit add or subtract problem (10–99 range; subtraction never goes negative). The result includes the operands AND the correct answer for your private use — DO NOT speak the correct answer aloud, only ask the question.
 - 'checkMathAnswer' verifies the user's response. Pass the same a, b, and operation values from generateMathProblem plus the number the user said. The tool tells you whether they were right and what the correct answer is — be the source of truth, don't compute it yourself.
 Offer math games when it feels natural (kid says they're bored, asks to play a game, mentions homework). Don't force it; if they decline, drop the topic.`);
+
+  // --- 8. Safety block — MUST stay last (#33) ---
+  parts.push(SAFETY_BLOCK);
 
   return parts.join('\n\n');
 }

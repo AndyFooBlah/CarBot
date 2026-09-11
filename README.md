@@ -11,7 +11,7 @@ Built on [`@andyfooblah/voice-common`](https://github.com/AndyFooBlah/VoiceCommo
 - **Live voice sessions** — Talk to CarBot hands-free during a car ride. Powered by the Gemini Live API with real-time audio streaming.
 - **Trip-aware context** — CarBot knows whether it's a morning school commute, afternoon pickup, or weekend trip, and adjusts accordingly.
 - **Memory across sessions** — Facts, interests, upcoming events, and preferences mentioned in conversations are extracted and remembered for next time.
-- **Context documents** — Parents can upload school newsletters, permission slips, or any text they want CarBot to know about. Emails forwarded to CarBot's Gmail address are automatically converted to context.
+- **Context documents** — Parents can upload school newsletters, permission slips, or any text they want CarBot to know about. Emails forwarded to CarBot's Gmail address arrive as *inactive* context documents for the parent to review and switch on.
 - **Session recap emails** — After each session, CarBot emails the parent a warm summary of what was talked about, with a link to the full transcript.
 - **Transcript editing** — Both the raw and AI-cleaned transcript can be corrected after the fact. All edits are versioned; originals are never overwritten.
 - **Memory browser** — Browse, edit, or delete any fact CarBot has remembered about the family.
@@ -338,7 +338,7 @@ You can view, edit, or delete memories in the **Memories** tab.
 
 ## How email works
 
-**Inbound** — Forward any email to CarBot's Gmail address and it will automatically become an active context document for the next session. Useful for school newsletters, event announcements, or anything you want CarBot to know about.
+**Inbound** — Forward any email to CarBot's Gmail address and it becomes a context document. Forwarded email is third-party text, so it arrives **inactive**: the Context page shows an "N new documents to review" badge, and nothing reaches the child's prompt until you turn the document on. Useful for school newsletters, event announcements, or anything you want CarBot to know about.
 
 **Outbound** — After each session, CarBot emails you a friendly recap summarizing what was talked about, memorable moments, and any dates or plans mentioned. Includes a link to the full transcript.
 

@@ -37,6 +37,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@andyfooblah/voice-common';
 import type { Memory, MemoryCategory } from '../types';
+import { sanitizeInline, MAX_MEMORY_ITEM_CHARS } from './promptSafety';
 
 // ---------------------------------------------------------------------------
 // Read
@@ -92,7 +93,7 @@ export async function getMemoryContextString(
       daysAgo === 0 ? 'today' :
       daysAgo === 1 ? 'yesterday' :
       `${daysAgo} days ago`;
-    return `• ${m.content} (${when})`;
+    return `• ${sanitizeInline(m.content, MAX_MEMORY_ITEM_CHARS)} (${when})`;
   });
 
   return `Recent things you know about this family:\n${bullets.join('\n')}`;

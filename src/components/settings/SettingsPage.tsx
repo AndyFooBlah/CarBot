@@ -27,6 +27,7 @@ import { proxyResolveAddress } from '../../services/geoProxy';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { previewVoice } from '../../services/voicePreview';
 import { invokeGemini, GEMINI_FLASH_MODEL } from '../../services/geminiBroker';
+import { KID_SAFETY_SETTINGS } from '../../services/promptSafety';
 import {
   saveRoutine,
   saveLocations,
@@ -82,6 +83,8 @@ Return only valid JSON array, nothing else.`;
   const response = await invokeGemini({
     model: GEMINI_FLASH_MODEL,
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    // Server enforces these regardless; sent explicitly so intent is visible.
+    config: { safetySettings: [...KID_SAFETY_SETTINGS] },
   });
 
   const text = response.text ?? '';

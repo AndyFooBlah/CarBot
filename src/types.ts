@@ -203,6 +203,12 @@ export interface ContextDocument {
   active: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  /**
+   * Set when a parent has looked at the document (toggled it, edited it, or
+   * pressed "Mark reviewed"). Email-sourced docs arrive inactive and without
+   * this field; the Context page counts those as "new documents to review".
+   */
+  reviewedAt?: Timestamp;
   /** Present when source === 'email'. */
   emailId?: string;
   /** Original filename when source === 'upload'. */
