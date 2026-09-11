@@ -31,6 +31,7 @@
 
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { defineSecret } from 'firebase-functions/params';
+import { FLASH_MODEL } from './models';
 import type { MemoryFact, TranscriptEntry, SessionDocument } from './types';
 
 export const geminiApiKey = defineSecret('GEMINI_API_KEY');
@@ -163,7 +164,7 @@ export async function extractMemoriesFromSession(sessionId: string): Promise<voi
   // Call Gemini
   const apiKey = geminiApiKey.value();
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${FLASH_MODEL}:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -189,7 +190,7 @@ export async function extractMemoriesFromSession(sessionId: string): Promise<voi
   // Session-level memories (source of truth)
   batch.set(
     db.collection('sessions').doc(sessionId).collection('memories').doc('facts'),
-    { facts, extractedAt: now, model: 'gemini-3-flash-preview' },
+    { facts, extractedAt: now, model: FLASH_MODEL },
   );
 
   // Fan out to cross-session index

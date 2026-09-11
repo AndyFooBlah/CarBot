@@ -39,6 +39,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { google } from 'googleapis';
 import { defineSecret } from 'firebase-functions/params';
 import { geminiApiKey } from './memoryExtraction';
+import { FLASH_MODEL } from './models';
 import type { SessionDocument, UserDocument, TranscriptEntry } from './types';
 
 export const gmailClientId = defineSecret('GMAIL_CLIENT_ID');
@@ -164,7 +165,7 @@ export async function sendSessionSummaryEmail(sessionId: string): Promise<void> 
       + transcriptText;
 
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${FLASH_MODEL}:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

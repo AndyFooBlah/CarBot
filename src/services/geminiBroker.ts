@@ -30,6 +30,13 @@
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '@andyfooblah/voice-common';
 
+/**
+ * The one Gemini text model the browser names directly (schedule parsing in
+ * SettingsPage). Must be in the server allow-list; keep in sync with
+ * `FLASH_MODEL` in functions/src/models.ts (verified 2026-09-10).
+ */
+export const GEMINI_FLASH_MODEL = 'gemini-3.8-flash';
+
 export interface MintGeminiLiveTokenResponse {
   token: string;
   expireTime: string;

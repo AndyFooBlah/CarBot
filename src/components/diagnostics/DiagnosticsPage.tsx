@@ -17,7 +17,7 @@
  *
  * Sections:
  *   1. External-service probes (Wikipedia, Jokes, geoProxy tools, Firestore,
- *      Gemini Live WebSocket reachability)
+ *      Gemini Live WebSocket reachability, post-session Gemini models)
  *   2. Voice-quota usage for the current UTC day
  *   3. Per-session manual triggers (clean transcript, extract memories,
  *      re-send summary email) for the most recent completed session
@@ -35,6 +35,7 @@ import {
   callCleanTranscriptForSession,
   callExtractMemoriesForSession,
   callSendSummaryEmailForSession,
+  callProbeModels,
 } from '../../services/diagnosticsActions';
 
 // ---------------------------------------------------------------------------
@@ -151,11 +152,24 @@ function ServiceProbes({ uid }: { uid: string | undefined }) {
         });
       }),
     ]);
-    setResults(
-      settled.map((s) =>
-        s.status === 'fulfilled' ? s.value : { label: '?', latencyMs: null, error: String(s.reason), ok: false },
-      ),
+    const base = settled.map((s) =>
+      s.status === 'fulfilled' ? s.value : { label: '?', latencyMs: null, error: String(s.reason), ok: false },
     );
+    // Post-session models: one callable, one row per model so a retired ID
+    // (Google shuts previews down with short notice) is visible here rather
+    // than failing silently in the nightly jobs (#32).
+    let modelRows: ProbeResult[];
+    try {
+      modelRows = (await callProbeModels()).map((m) => ({
+        label: `Gemini model — ${m.model}`,
+        latencyMs: m.latencyMs,
+        error: m.error,
+        ok: m.ok,
+      }));
+    } catch (err) {
+      modelRows = [{ label: 'Gemini models (probeModels)', latencyMs: null, error: err instanceof Error ? err.message : String(err), ok: false }];
+    }
+    setResults([...base, ...modelRows]);
     setRunning(false);
   }, [uid]);
 

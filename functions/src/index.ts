@@ -43,6 +43,7 @@ import { onCall } from 'firebase-functions/v2/https';
 import { buildMintGeminiLiveTokenHandler } from './liveToken';
 import { buildInvokeGeminiHandler } from './invokeGemini';
 import { buildEmbedGeminiHandler } from './embedGemini';
+import { buildProbeModelsHandler } from './probeModels';
 import {
   gmailClientId,
   gmailClientSecret,
@@ -68,6 +69,12 @@ export const invokeGemini = onCall(
 export const embedGemini = onCall(
   { secrets: [geminiApiKey], timeoutSeconds: 60, region: 'us-central1' },
   buildEmbedGeminiHandler({ apiKey: () => geminiApiKey.value() }),
+);
+
+/** Diagnostics: 1-token reachability probe of every post-session model (#32). */
+export const probeModels = onCall(
+  { secrets: [geminiApiKey], timeoutSeconds: 60, region: 'us-central1' },
+  buildProbeModelsHandler({ apiKey: () => geminiApiKey.value() }),
 );
 
 export {

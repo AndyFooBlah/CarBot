@@ -22,6 +22,7 @@
 
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { geminiApiKey } from './memoryExtraction';
+import { FLASH_LITE_MODEL } from './models';
 import type { TranscriptEntry, SessionDocument, UserDocument } from './types';
 
 const CLEAN_TRANSCRIPT_PROMPT = `You are cleaning up a raw voice transcription from a car conversation between a parent, their child, and an AI assistant named CarBot.
@@ -110,7 +111,7 @@ export async function generateCleanTranscript(
   // Call Gemini
   const apiKey = geminiApiKey.value();
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${FLASH_LITE_MODEL}:generateContent?key=${apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -145,7 +146,7 @@ export async function generateCleanTranscript(
     .set({
       entries: cleanedEntries,
       generatedAt: Timestamp.now(),
-      model: 'gemini-3.1-flash-lite-preview',
+      model: FLASH_LITE_MODEL,
       version: 1,
     });
 

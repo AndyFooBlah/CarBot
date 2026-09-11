@@ -32,6 +32,7 @@ import { GoogleGenAI } from '@google/genai';
 import { HttpsError, CallableRequest } from 'firebase-functions/v2/https';
 import { logger } from 'firebase-functions';
 import { enforceRateLimit } from './rateLimit';
+import { FLASH_MODEL, FLASH_LITE_MODEL } from './models';
 
 /**
  * Models the client is allowed to invoke through the proxy. Keep this tight
@@ -41,9 +42,8 @@ import { enforceRateLimit } from './rateLimit';
  */
 const ALLOWED_MODELS = new Set<string>([
   'gemini-3.1-pro-preview',
-  'gemini-3-flash-preview',
-  'gemini-3.1-flash-preview',
-  'gemini-3.1-flash-lite-preview',
+  FLASH_MODEL,
+  FLASH_LITE_MODEL,
   'gemini-2.5-flash',
   'gemini-embedding-001',
 ]);

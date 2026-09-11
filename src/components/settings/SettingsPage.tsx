@@ -26,7 +26,7 @@ import { useAuth } from '@andyfooblah/voice-common';
 import { proxyResolveAddress } from '../../services/geoProxy';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { previewVoice } from '../../services/voicePreview';
-import { invokeGemini } from '../../services/geminiBroker';
+import { invokeGemini, GEMINI_FLASH_MODEL } from '../../services/geminiBroker';
 import {
   saveRoutine,
   saveLocations,
@@ -80,7 +80,7 @@ Examples:
 Return only valid JSON array, nothing else.`;
 
   const response = await invokeGemini({
-    model: 'gemini-3-flash-preview',
+    model: GEMINI_FLASH_MODEL,
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
   });
 

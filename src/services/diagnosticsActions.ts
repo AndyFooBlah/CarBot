@@ -30,6 +30,24 @@ export async function callExtractMemoriesForSession(sessionId: string): Promise<
   await fn({ sessionId });
 }
 
+export interface ModelProbeResult {
+  model: string;
+  ok: boolean;
+  latencyMs: number;
+  error: string | null;
+}
+
+/**
+ * Ask the server to send a 1-token prompt to every post-session Gemini model
+ * (functions/src/models.ts). A retired model ID shows up here as ok=false
+ * instead of failing silently in the nightly jobs.
+ */
+export async function callProbeModels(): Promise<ModelProbeResult[]> {
+  const fn = httpsCallable<void, { results: ModelProbeResult[] }>(functions, 'probeModels');
+  const res = await fn();
+  return res.data.results;
+}
+
 export async function callSendSummaryEmailForSession(sessionId: string): Promise<void> {
   const fn = httpsCallable<{ sessionId: string }, { success: boolean }>(functions, 'sendSummaryEmailForSession');
   await fn({ sessionId });
