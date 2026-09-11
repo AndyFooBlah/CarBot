@@ -7,10 +7,8 @@ on:
     branches: [main]
 
 # CarBot consumes @andyfooblah/voice-common and @andyfooblah/knowledge-common
-# via `file:../voicecommon` and `file:../knowledgecommon` paths. In CI we
-# check out the peer repos as siblings so those paths resolve. Both peer
-# repos are public, so no token is needed — this also lets CI run on
-# forked pull requests (a repo secret would be unavailable to forks).
+# as published npm packages, so a single checkout + `npm ci` is all that is
+# needed (no sibling-repo checkout or library build).
 jobs:
   # ---------------------------------------------------------------------------
   # Frontend: type-check, lint, test
@@ -20,81 +18,49 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out CarBot
+      - name: Check out
         uses: actions/checkout@v4
-        with:
-          path: carbot
-
-      - name: Check out VoiceCommon
-        uses: actions/checkout@v4
-        with:
-          repository: andyfooblah/VoiceCommon
-          path: voicecommon
-
-      - name: Check out KnowledgeCommon
-        uses: actions/checkout@v4
-        with:
-          repository: andyfooblah/KnowledgeCommon
-          path: knowledgecommon
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: carbot/package-lock.json
-
-      - name: Build VoiceCommon lib
-        working-directory: voicecommon
-        run: |
-          npm ci
-          npm run build:lib
-
-      - name: Build KnowledgeCommon lib
-        working-directory: knowledgecommon
-        run: |
-          npm ci
-          npm run build:lib
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: carbot
         run: npm ci
 
       - name: Type-check
-        working-directory: carbot
         run: npx tsc --noEmit
 
       - name: Lint
-        working-directory: carbot
         run: npx eslint src --ext .ts,.tsx
 
       - name: Run tests
-        working-directory: carbot
         run: npm test
 
   # ---------------------------------------------------------------------------
-  # Cloud Functions: type-check and lint
+  # Cloud Functions: type-check
   # ---------------------------------------------------------------------------
   functions:
-    name: Cloud Functions (type-check, lint)
+    name: Cloud Functions (type-check)
     runs-on: ubuntu-latest
 
     defaults:
       run:
-        working-directory: carbot/functions
+        working-directory: functions
 
     steps:
-      - name: Check out CarBot
+      - name: Check out
         uses: actions/checkout@v4
-        with:
-          path: carbot
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: carbot/functions/package-lock.json
+          cache-dependency-path: functions/package-lock.json
 
       - name: Install dependencies
         run: npm ci

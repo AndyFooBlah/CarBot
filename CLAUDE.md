@@ -60,11 +60,18 @@ firebase deploy --only firestore:rules,storage
 firebase emulator:start        # start local emulators
 ```
 
-## VoiceCommon dependency
+## VoiceCommon / KnowledgeCommon dependencies
 
-CarBot uses `@andyfooblah/voice-common` as a `file:../voicecommon` dependency.
-After any changes to VoiceCommon, run `npm run build:lib` in the VoiceCommon
-directory, then `npm install` here to pick up the updated dist.
+CarBot consumes `@andyfooblah/voice-common` and `@andyfooblah/knowledge-common`
+as **published npm packages** (see `package.json`). To pick up a library change,
+publish a new version of the library and bump the range here (`npm install
+@andyfooblah/voice-common@^X.Y.Z`). Never switch these back to `file:../`
+paths — Dependabot cannot resolve path dependencies and every run fails (#31),
+and CI would again need sibling-repo checkouts.
+
+For short-lived local development against an unpublished library build, use
+`npm link ../voicecommon` and unlink before committing; the lockfile must
+always reference the registry tarballs.
 
 ## Architecture notes
 

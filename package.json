@@ -17,9 +17,9 @@
     "deploy:preview": "npm run build && firebase hosting:channel:deploy preview"
   },
   "dependencies": {
-    "@andyfooblah/knowledge-common": "file:../knowledgecommon",
-    "@andyfooblah/voice-common": "file:../voicecommon",
-    "@google/genai": "^1.41.0",
+    "@andyfooblah/knowledge-common": "^1.2.1",
+    "@andyfooblah/voice-common": "^0.14.0",
+    "@google/genai": "^2.22.0",
     "firebase": "^12.9.0",
     "pdfjs-dist": "^4.10.38",
     "react": "^19.2.3",

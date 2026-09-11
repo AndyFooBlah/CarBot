@@ -55,8 +55,8 @@ Built on [`@andyfooblah/voice-common`](https://github.com/AndyFooBlah/VoiceCommo
 | Layer | Technology |
 |---|---|
 | Frontend framework | React 19, TypeScript, Vite, Tailwind CSS v4 |
-| Voice AI framework | [`@andyfooblah/voice-common`](https://github.com/AndyFooBlah/VoiceCommon) v0.6.0+ |
-| Knowledge tools | [`@andyfooblah/knowledge-common`](https://github.com/AndyFooBlah/KnowledgeCommon) v1.0.0+ |
+| Voice AI framework | [`@andyfooblah/voice-common`](https://github.com/AndyFooBlah/VoiceCommon) v0.14+ (npm) |
+| Knowledge tools | [`@andyfooblah/knowledge-common`](https://github.com/AndyFooBlah/KnowledgeCommon) v1.2+ (npm) |
 | Voice model | Google Gemini Live (`gemini-3.1-flash-live-preview`) |
 | Post-processing AI | Google Gemini 3 / 3.1 Flash family (`gemini-3-flash-preview`, `gemini-3.1-flash-lite-preview`); embeddings via `gemini-embedding-001` |
 | Auth | Firebase Authentication (Google OAuth + email/password) |
@@ -158,16 +158,7 @@ npm install
 cd functions && npm install && cd ..
 ```
 
-CarBot depends on VoiceCommon and KnowledgeCommon as local packages (`file:../voicecommon`, `file:../knowledgecommon`). Clone both alongside CarBot so the paths resolve:
-
-```bash
-# In the parent directory:
-git clone https://github.com/AndyFooBlah/VoiceCommon.git
-cd VoiceCommon && npm install && npm run build:lib && cd ..
-
-git clone https://github.com/AndyFooBlah/KnowledgeCommon.git
-cd KnowledgeCommon && npm install && npm run build:lib && cd ..
-```
+CarBot depends on [`@andyfooblah/voice-common`](https://www.npmjs.com/package/@andyfooblah/voice-common) and [`@andyfooblah/knowledge-common`](https://www.npmjs.com/package/@andyfooblah/knowledge-common) as published npm packages — `npm install` pulls them in; no sibling checkouts or library builds are needed. (To develop against a local checkout of either library, use `npm link` temporarily; do not commit a `file:` path — it breaks Dependabot and CI.)
 
 Both libraries are initialized in `src/index.tsx` before the React app mounts. `initializeVoiceCommon` sets up Firebase and the Gemini API key for voice sessions; `initializeKnowledgeCommon` sets up the knowledge tools (weather, maps, jokes, Wikipedia, date/time) with the same Firestore instance and an optional Google Maps API key.
 
@@ -306,7 +297,7 @@ Tests use Vitest with jsdom. Firebase and VoiceCommon are fully mocked — no em
 GitHub Actions runs on every push to `main` and every pull request:
 
 - **Frontend** — type-check, ESLint, Vitest
-- **Cloud Functions** — type-check, ESLint
+- **Cloud Functions** — type-check
 
 See `.github/workflows/ci.yml`.
 
