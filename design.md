@@ -234,6 +234,12 @@ interface MemoryFact {
 
 ---
 
+### 3.12 Data lifecycle (#34)
+
+- `users/{uid}.audioRetentionDays?: 30 | 90 | 365 | null` — how long session audio is kept; `null` = forever, unset = default 90. Validated by Firestore rules.
+- `sessions/{id}.audioPurgedAt?: Timestamp` — written by the nightly `enforceAudioRetention` job when the `.webm` is deleted (and `audioUrl` cleared). Transcripts / memories are kept.
+- Deletion is server-side only: `deleteSession` (doc + `transcript/*` + `transcriptEdits/*` + `memories/*` + fanned-out `memories/{id}` + Storage object) and `deleteAccount` (all sessions, `context_documents`, `emails`, `memories`, `_usage`, `users/{uid}`, the `sessions/{uid}/` Storage prefix, then the Auth user). Firestore rules deny client `delete` on `sessions/*` and `users/*`. Pure selection logic in `functions/src/retentionPolicy.ts` (tested from the root suite).
+
 ## 4. Feature Design
 
 ### 4.1 Trip Context Inference

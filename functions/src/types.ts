@@ -54,6 +54,8 @@ export interface SessionDocument {
   summary?: string;
   tripContext?: string;
   contextDocIds?: string[];
+  /** Set by the nightly retention job when the .webm was deleted (audioUrl is then ''). */
+  audioPurgedAt?: Timestamp;
 }
 
 export interface UserDocument {
@@ -62,4 +64,6 @@ export interface UserDocument {
   childName?: string;
   emailSummariesEnabled?: boolean;
   timezone?: string;
+  /** Audio retention: 30 | 90 | 365 days, null = forever, undefined = default (90). */
+  audioRetentionDays?: 30 | 90 | 365 | null;
 }

@@ -346,6 +346,36 @@ Email summaries can be disabled in **Settings → Profile**.
 
 ---
 
+## Privacy & data
+
+CarBot records children's voices, so this is spelled out explicitly.
+
+**What is collected**
+
+| Data | Where it goes | How long |
+|---|---|---|
+| Live microphone audio during a session | Streamed to the Gemini Live API (Google) for the duration of the session only; Google's [Gemini API data-use terms](https://ai.google.dev/gemini-api/terms) apply. Not stored by CarBot in transit. | Transient |
+| Session recording (`.webm`) | Firebase Cloud Storage, `sessions/{userId}/{sessionId}.webm`, readable only by the owning account | Parent-chosen: 30 / 90 / 365 days or forever (default **90 days**); the nightly job deletes expired recordings |
+| Raw and AI-cleaned transcripts, edits | Cloud Firestore under the session | Until the session or account is deleted |
+| Extracted memory facts, one-line session summary | Cloud Firestore (`sessions/{id}/memories`, `memories/`) | Until edited/deleted, or the session or account is deleted |
+| Context documents, forwarded emails | Cloud Firestore (`context_documents/`, `emails/`) | Until deleted, or the account is deleted |
+| Profile: child's first name, bot name, schedule, named places | Cloud Firestore (`users/{uid}`) | Until the account is deleted |
+| Current city at session start | Sent to the `geoProxy` callable to reverse-geocode; used only inside that session's prompt | **Never stored** |
+
+Post-session processing (transcript cleaning, memory extraction, the recap email) sends transcript text to the Gemini API from Cloud Functions; nothing is shared with any other third party. There is no analytics or ad SDK in the app.
+
+**Kid-safety controls** — a non-negotiable safety block is appended last to every system instruction; the strictest Gemini `safetySettings` are enforced server-side on proxied text calls; third-party text (documents, emails, memories) is delimited and capped so it cannot act as instructions; forwarded emails arrive inactive until a parent reviews them. See `src/services/promptSafety.ts`.
+
+**How to delete**
+
+- *One session* — open it under **Sessions** and press **Delete session**. Removes the record, both transcripts and their edit history, the memories learned from it, and the recording.
+- *Everything* — **Settings → Privacy & data → Delete my account and all data**. Removes every session (as above), context documents, emails, memories, usage counters, the profile, and the Firebase Auth user. The recap-email address is not retained.
+- *Audio retention* — **Settings → Privacy & data → Keep session audio for**.
+
+Deletion runs server-side (`deleteSession` / `deleteAccount` callables). Firestore rules deny client-side deletes of session and profile documents so nothing can be left half-deleted.
+
+---
+
 ## Security
 
 - All Firestore documents include a `userId` field; rules block any read or write where the caller's UID doesn't match.

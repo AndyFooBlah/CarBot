@@ -20,6 +20,8 @@
  *                             transcript and generates them
  *   cleanStaleActiveSessions — marks sessions stuck in 'active' for > 6 hours
  *                             as 'interrupted' so they don't pollute counts
+ *   enforceAudioRetention   — deletes session audio older than each parent's
+ *                             audioRetentionDays setting (dataLifecycle.ts, #34)
  *
  * Callable (authenticated, per-session):
  *   cleanTranscriptForSession — manually regenerate a clean transcript for a
@@ -40,6 +42,7 @@ import {
   carbotEmailAddress,
   carbotWebUrl,
 } from './sessionSummaryEmail';
+import { enforceAudioRetention } from './dataLifecycle';
 
 // ---------------------------------------------------------------------------
 // Scheduled: clean transcripts missed by onSessionCompleted
@@ -62,6 +65,7 @@ export const dailyDataCleanup = onSchedule(
       repairMissedMemories(db),
       cleanStaleActiveSessions(db),
       cleanWikipediaCache(db),
+      enforceAudioRetention(db),
     ]);
 
     for (const [i, result] of results.entries()) {
@@ -70,6 +74,7 @@ export const dailyDataCleanup = onSchedule(
         'repairMissedMemories',
         'cleanStaleActiveSessions',
         'cleanWikipediaCache',
+        'enforceAudioRetention',
       ];
       if (result.status === 'rejected') {
         console.error(`[dailyDataCleanup] ${names[i]} failed:`, result.reason);

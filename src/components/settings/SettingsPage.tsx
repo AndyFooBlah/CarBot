@@ -15,14 +15,17 @@
 /**
  * Settings page (/settings).
  *
- * Three sections:
+ * Four sections:
  *   1. Profile — child's name, email summaries
  *   2. Routine — freeform activity input parsed by Gemini Flash
  *   3. Locations — named places (home, school, etc.) resolved via Maps geocoding
+ *   4. Privacy & data — audio retention window, delete account (#34)
  */
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@andyfooblah/voice-common';
+import { deleteAccount, AUDIO_RETENTION_CHOICES } from '../../services/dataLifecycle';
 import { proxyResolveAddress } from '../../services/geoProxy';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { previewVoice } from '../../services/voicePreview';
@@ -35,8 +38,9 @@ import {
   saveBotName,
   saveEmailSummariesEnabled,
   saveSelectedVoice,
+  saveAudioRetentionDays,
 } from '../../services/userProfile';
-import type { DayOfWeek, Routine, ScheduleEntry, NamedLocation } from '../../types';
+import type { DayOfWeek, Routine, ScheduleEntry, NamedLocation, AudioRetentionDays } from '../../types';
 
 // ---------------------------------------------------------------------------
 // Gemini schedule parser
@@ -358,10 +362,16 @@ function AddLocationForm({
 // ---------------------------------------------------------------------------
 
 export function SettingsPage() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const { profile, loading, refetch } = useUserProfile(user?.uid ?? null);
   const [saved, setSaved] = useState('');
   const [error, setError] = useState('');
+
+  // Privacy & data
+  const [retentionDays, setRetentionDays] = useState<AudioRetentionDays>(90);
+  const [deletePhrase, setDeletePhrase] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   // Profile fields
   const [childName, setChildName] = useState('');
@@ -393,6 +403,8 @@ export function SettingsPage() {
     if (profile.locations) {
       setLocations(profile.locations);
     }
+    // undefined = never set = default (90); null = forever
+    setRetentionDays(profile.audioRetentionDays === undefined ? 90 : profile.audioRetentionDays);
   }, [profile]);
 
   const flash = (msg: string) => {
@@ -473,6 +485,32 @@ export function SettingsPage() {
       refetch();
     } catch (err) {
       setError(String(err));
+    }
+  };
+
+  const handleSaveRetention = async () => {
+    if (!user) return;
+    try {
+      await saveAudioRetentionDays(user.uid, retentionDays);
+      flash('Retention setting saved');
+      refetch();
+    } catch (err) {
+      setError(String(err));
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!user || deletePhrase !== 'DELETE') return;
+    if (!confirm('Permanently delete your CarBot account and ALL data — every session, recording, transcript, memory, context document and email? This cannot be undone.')) return;
+    setDeletingAccount(true);
+    try {
+      await deleteAccount('DELETE');
+      // The Auth user is gone server-side; clear the local session and leave.
+      await signOut().catch(() => null);
+      navigate('/login', { replace: true });
+    } catch (err) {
+      setError(`Account deletion failed: ${err instanceof Error ? err.message : String(err)}`);
+      setDeletingAccount(false);
     }
   };
 
@@ -697,6 +735,60 @@ export function SettingsPage() {
         >
           Save Locations
         </button>
+      </Section>
+
+      {/* Privacy & data */}
+      <Section title="Privacy & data">
+        <p className="text-sm text-slate-500 -mt-1">
+          Session recordings are stored in your private Cloud Storage space. Choose how long to keep the audio;
+          transcripts and memories are kept until you delete a session or your account.
+        </p>
+        <Field label="Keep session audio for" hint="Checked nightly. Expired recordings are deleted and can't be recovered.">
+          <div className="flex items-center gap-2">
+            <select
+              value={retentionDays === null ? 'forever' : String(retentionDays)}
+              onChange={(e) => setRetentionDays(e.target.value === 'forever' ? null : (Number(e.target.value) as AudioRetentionDays))}
+              className="flex-1 px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            >
+              {AUDIO_RETENTION_CHOICES.map((c) => (
+                <option key={String(c.value)} value={c.value === null ? 'forever' : String(c.value)}>{c.label}</option>
+              ))}
+            </select>
+            <button
+              onClick={handleSaveRetention}
+              className="shrink-0 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors"
+            >
+              Save
+            </button>
+          </div>
+        </Field>
+
+        <div className="border border-red-200 bg-red-50/40 rounded-xl p-4 space-y-3">
+          <div>
+            <p className="text-sm font-semibold text-red-700">Delete account</p>
+            <p className="text-xs text-red-600/80 mt-0.5">
+              Permanently removes every session, recording, transcript, memory, context document and forwarded email,
+              then deletes your sign-in. Type <span className="font-mono font-bold">DELETE</span> to enable the button.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={deletePhrase}
+              onChange={(e) => setDeletePhrase(e.target.value)}
+              placeholder="DELETE"
+              aria-label="Type DELETE to confirm"
+              className="w-32 px-3 py-2 border border-red-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-red-400"
+            />
+            <button
+              onClick={handleDeleteAccount}
+              disabled={deletePhrase !== 'DELETE' || deletingAccount}
+              className="px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {deletingAccount ? 'Deleting everything…' : 'Delete my account and all data'}
+            </button>
+          </div>
+        </div>
       </Section>
     </div>
   );

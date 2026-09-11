@@ -27,7 +27,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '@andyfooblah/voice-common';
-import type { CarbotUserProfile, Routine, NamedLocation } from '../types';
+import type { CarbotUserProfile, Routine, NamedLocation, AudioRetentionDays } from '../types';
 
 /** Fetch the user profile. Returns null if the document does not exist. */
 export async function getUserProfile(uid: string): Promise<CarbotUserProfile | null> {
@@ -87,6 +87,11 @@ export async function markBotNameIntroduced(uid: string): Promise<void> {
 /** Update the Gemini Live voice selection. */
 export async function saveSelectedVoice(uid: string, selectedVoice: string): Promise<void> {
   await updateDoc(doc(db, 'users', uid), { selectedVoice });
+}
+
+/** Update how long session audio is kept (null = forever). Enforced by the nightly job. */
+export async function saveAudioRetentionDays(uid: string, days: AudioRetentionDays): Promise<void> {
+  await updateDoc(doc(db, 'users', uid), { audioRetentionDays: days });
 }
 
 /** Update the email summaries enabled setting. */

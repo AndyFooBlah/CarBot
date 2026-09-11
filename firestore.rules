@@ -46,7 +46,18 @@ service cloud.firestore {
     // ---------------------------------------------------------------------------
 
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read, create: if isOwner(userId);
+      // audioRetentionDays, when present, must be one of the supported
+      // windows (null = keep forever). Enforced by the nightly job (#34).
+      allow update: if isOwner(userId)
+        && (
+          !has('audioRetentionDays')
+          || request.resource.data.audioRetentionDays == null
+          || request.resource.data.audioRetentionDays in [30, 90, 365]
+        );
+      // Profile deletion goes through the deleteAccount callable, which also
+      // removes sessions, audio, memories, docs and the Auth user (#34).
+      allow delete: if false;
     }
 
     // ---------------------------------------------------------------------------
@@ -78,7 +89,10 @@ service cloud.firestore {
           !has('status') ||
           request.resource.data.status in ['completed', 'interrupted', 'active']
         );
-      allow delete: if isOwner(resource.data.userId);
+      // Deletion goes through the deleteSession callable so subcollections,
+      // fanned-out memories and the Storage recording are removed together
+      // instead of being orphaned by a bare document delete (#34).
+      allow delete: if false;
 
       // Raw transcript written by the client in real-time during a session.
       match /transcript/{docId} {

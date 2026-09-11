@@ -120,7 +120,16 @@ export interface CarbotUserProfile {
   emailSummariesEnabled?: boolean;
   /** Gemini Live voice name (e.g. "Puck", "Kore"). Default: Gemini API default (Puck). */
   selectedVoice?: string;
+  /**
+   * How long session AUDIO is kept before the nightly job deletes the .webm
+   * (transcripts and memories are kept). 30 | 90 | 365 days; null = forever;
+   * undefined = default (90). Enforced server-side (#34).
+   */
+  audioRetentionDays?: AudioRetentionDays;
 }
+
+/** Allowed audio-retention settings; mirrors functions/src/retentionPolicy.ts. */
+export type AudioRetentionDays = 30 | 90 | 365 | null;
 
 // ---------------------------------------------------------------------------
 // Session extension fields
@@ -137,6 +146,8 @@ export interface CarbotSessionFields {
   contextDocIds: string[];
   /** One-line AI summary — written post-session by Cloud Function. */
   summary?: string;
+  /** Set by the nightly retention job when the recording was deleted (audioUrl is then ''). */
+  audioPurgedAt?: Timestamp;
 }
 
 // ---------------------------------------------------------------------------

@@ -149,7 +149,7 @@ The primary interaction mode is **voice only** — the app launches on a phone o
 
 **NFR-2 Availability:** The app shall be functional offline for up to 30 seconds of interrupted connectivity without crashing (graceful degradation).
 
-**NFR-3 Data retention:** All session artifacts (audio, transcripts, memories) shall be retained indefinitely. No automated purge policy.
+**NFR-3 Data retention & deletion:** Session **audio** is retained for a parent-configurable window — 30, 90 or 365 days, or indefinitely — defaulting to 90 days; a nightly job deletes expired recordings and clears the session's `audioUrl`. Transcripts, memories and session records are retained until the parent deletes them. Parents can delete any individual session (record, transcripts, edits, the memories learned from it, and the recording) and can delete their whole account (all of the above plus context documents, ingested emails and the sign-in itself). Deletion is performed server-side by callables so nothing is left orphaned; clients cannot delete session or profile documents directly.
 
 **NFR-4 Privacy:** Location data is never stored. Conversation data is stored only in the user's own Firestore/GCS namespace. No data is shared with third parties beyond the Google services already in use (Firebase, Gemini, Gmail).
 

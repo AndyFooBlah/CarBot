@@ -21,11 +21,12 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getSession, useAuth, functions } from '@andyfooblah/voice-common';
 import type { TranscriptEntry } from '@andyfooblah/voice-common';
 import { httpsCallable } from 'firebase/functions';
 import { getSessionMemories } from '../../services/memories';
+import { deleteSession } from '../../services/dataLifecycle';
 import {
   getRawTranscript,
   getCleanTranscript,
@@ -291,10 +292,27 @@ function TranscriptView({
 export function SessionDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [session, setSession] = useState<CarbotSession | null>(null);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [tab, setTab] = useState<Tab>('raw');
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  const handleDelete = async () => {
+    if (!id) return;
+    if (!confirm('Delete this session? The recording, transcripts, edits and the memories learned from it will be permanently removed. This cannot be undone.')) return;
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await deleteSession(id);
+      navigate('/sessions');
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : String(err));
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     if (!id || !user) return;
@@ -356,12 +374,26 @@ export function SessionDetail() {
               }`}>{session.status}</span>
             </div>
           </div>
+          <button
+            onClick={handleDelete}
+            disabled={deleting || session.status === 'active'}
+            title={session.status === 'active' ? 'Stop the session first' : 'Permanently delete this session and its recording'}
+            className="shrink-0 text-xs text-red-500 hover:text-red-700 border border-red-200 hover:bg-red-50 rounded-lg px-3 py-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {deleting ? 'Deleting…' : 'Delete session'}
+          </button>
         </div>
+        {deleteError && <p className="mt-2 text-xs text-red-600">Delete failed: {deleteError}</p>}
         {session.summary && (
           <p className="mt-3 text-slate-700 text-sm bg-slate-50 rounded-xl px-3 py-2">{session.summary}</p>
         )}
 
         {/* Audio player */}
+        {!session.audioUrl && session.audioPurgedAt && (
+          <p className="mt-4 text-xs text-slate-500">
+            Recording removed under your audio retention setting (Settings → Privacy &amp; data). Transcripts are kept.
+          </p>
+        )}
         {session.audioUrl && (
           <div className="mt-4">
             <p className="text-xs text-slate-500 mb-1">Session audio</p>

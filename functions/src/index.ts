@@ -88,6 +88,7 @@ export {
   recordVoiceUsage,
   getVoiceQuotaStatus,
 } from './voiceQuota';
+export { deleteSession, deleteAccount } from './dataLifecycle';
 
 initializeApp();
 
