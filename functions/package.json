@@ -6,7 +6,7 @@
     "build": "tsc",
     "build:watch": "tsc --watch",
     "serve": "npm run build && firebase emulators:start --only functions",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src"
   },
   "engines": {
     "node": "22"
@@ -19,8 +19,12 @@
     "googleapis": "^180.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@types/node": "^22.0.0",
-    "typescript": "~5.8.2"
+    "eslint": "^9.39.5",
+    "globals": "^17.12.0",
+    "typescript": "~5.8.2",
+    "typescript-eslint": "^8.70.0"
   },
   "private": true
 }

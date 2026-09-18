@@ -273,6 +273,7 @@ npx eslint src --ext .ts,.tsx  # Lint
 cd functions
 npm run build        # Compile TypeScript
 npm run build:watch  # Watch mode
+npm run lint         # Lint (ESLint flat config in functions/eslint.config.mjs)
 
 # Deploy everything
 npm run deploy
@@ -297,7 +298,7 @@ Tests use Vitest with jsdom. Firebase and VoiceCommon are fully mocked — no em
 GitHub Actions runs on every push to `main` and every pull request:
 
 - **Frontend** — type-check, ESLint, Vitest
-- **Cloud Functions** — type-check
+- **Cloud Functions** — type-check, ESLint
 
 See `.github/workflows/ci.yml`.
 
