@@ -20,7 +20,7 @@
  * can read/write them.
  */
 
-import * as admin from 'firebase-admin';
+import { getFirestore, FieldValue, type Transaction } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 
 export const RATE_LIMITS = {
@@ -48,11 +48,11 @@ function utcDayKey(now = new Date()): string {
 export async function enforceRateLimit(uid: string, bucket: RateLimitBucket): Promise<void> {
   const cap = RATE_LIMITS[bucket];
   const dayKey = utcDayKey();
-  const db = admin.firestore();
+  const db = getFirestore();
   const docRef = db.collection('_usage').doc(uid).collection('daily').doc(dayKey);
   const field = `${bucket}Count`;
 
-  await db.runTransaction(async (tx) => {
+  await db.runTransaction(async (tx: Transaction) => {
     const snap = await tx.get(docRef);
     const current = (snap.exists ? (snap.data()?.[field] ?? 0) : 0) as number;
 
@@ -65,13 +65,13 @@ export async function enforceRateLimit(uid: string, bucket: RateLimitBucket): Pr
 
     if (snap.exists) {
       tx.update(docRef, {
-        [field]: admin.firestore.FieldValue.increment(1),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        [field]: FieldValue.increment(1),
+        updatedAt: FieldValue.serverTimestamp(),
       });
     } else {
       tx.set(docRef, {
         [field]: 1,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       });
     }
   });

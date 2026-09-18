@@ -25,7 +25,7 @@
 import { onCall, HttpsError, CallableRequest } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { logger } from 'firebase-functions';
-import * as admin from 'firebase-admin';
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { GoogleGenAI } from '@google/genai';
 import { enforceRateLimit } from './rateLimit';
 
@@ -132,7 +132,7 @@ export const cacheWikipediaArticle = onCall(
     const apiKey = geminiApiKey.value();
     if (!apiKey) throw new HttpsError('internal', 'GEMINI_API_KEY not configured.');
 
-    const db = admin.firestore();
+    const db = getFirestore();
     const articleRef = db.collection('wikipedia_cache').doc(articleId);
 
     let text: string | null;
@@ -159,7 +159,7 @@ export const cacheWikipediaArticle = onCall(
     const batch = db.batch();
     batch.set(articleRef, {
       title,
-      fetchedAt: admin.firestore.Timestamp.now(),
+      fetchedAt: Timestamp.now(),
       chunkCount: rawChunks.length,
     });
     for (let i = 0; i < rawChunks.length; i++) {
