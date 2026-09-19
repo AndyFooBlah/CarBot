@@ -21,10 +21,14 @@
  * PCM audio chunks through Web Audio, then closes the session.
  */
 
-import { GoogleGenAI, Modality, ThinkingLevel } from '@google/genai';
-import { mintGeminiLiveToken } from './geminiBroker';
+import { GoogleGenAI, Modality } from '@google/genai';
+import { GEMINI_LIVE_MODEL, mintGeminiLiveToken } from './geminiBroker';
 
-const PREVIEW_MODEL = 'gemini-3.1-flash-live-preview';
+/**
+ * The audition uses the same Live model as a real session, so a model that
+ * works here works there (and vice versa).
+ */
+const PREVIEW_MODEL = GEMINI_LIVE_MODEL;
 
 /**
  * Play a short voice preview of the given voice saying "Hi! I'm <botName>."
@@ -69,7 +73,8 @@ export async function previewVoice(
           parts: [{ text: 'You are a friendly AI assistant. Speak naturally and warmly.' }],
         },
         responseModalities: [Modality.AUDIO],
-        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+        // NOTE: GEMINI_LIVE_MODEL rejects thinkingConfig (WebSocket 1007).
+        // Do not reintroduce a thinkingLevel here.
         speechConfig: {
           voiceConfig: { prebuiltVoiceConfig: { voiceName } },
         },

@@ -37,6 +37,25 @@ import { functions } from '@andyfooblah/voice-common';
  */
 export const GEMINI_FLASH_MODEL = 'gemini-3.8-flash';
 
+/**
+ * Gemini Live model used by every realtime path in the browser: the main
+ * conversation (useCarbotSession) and the Settings voice audition
+ * (services/voicePreview.ts).
+ *
+ * `gemini-3.8-live` (stable, released 2026-09-15) replaced
+ * `gemini-3.1-flash-live-preview` (preview) at identical pricing.
+ *
+ * This model REJECTS `thinkingConfig` — sending it closes the WebSocket with
+ * 1007 before the session starts, which presents as a connection failure
+ * rather than a config error. Callers must pass VoiceCommon's
+ * `thinkingLevel: 'none'` (see {@link GEMINI_LIVE_THINKING_LEVEL}), or omit the
+ * field entirely on a direct ai.live.connect() call.
+ */
+export const GEMINI_LIVE_MODEL = 'gemini-3.8-live';
+
+/** VoiceCommon `thinkingLevel` value matching {@link GEMINI_LIVE_MODEL}. */
+export const GEMINI_LIVE_THINKING_LEVEL = 'none' as const;
+
 export interface MintGeminiLiveTokenResponse {
   token: string;
   expireTime: string;

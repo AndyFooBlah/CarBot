@@ -46,6 +46,7 @@ import {
   generateMathProblem,
   checkMathAnswer,
 } from '../services/mathGames';
+import { GEMINI_LIVE_MODEL, GEMINI_LIVE_THINKING_LEVEL } from '../services/geminiBroker';
 import { setSessionCarbotFields } from '../services/sessions';
 import { markBotNameIntroduced } from '../services/userProfile';
 import { checkAndReserveVoiceQuota, recordVoiceUsage } from '../services/voiceQuota';
@@ -100,6 +101,12 @@ export function useCarbotSession(options: UseCarbotSessionOptions): UseCarbotSes
     speechConfig: profile.selectedVoice ? {
       voiceConfig: { prebuiltVoiceConfig: { voiceName: profile.selectedVoice } },
     } : undefined,
+    // gemini-3.8-live (stable) replaces gemini-3.1-flash-live-preview at the
+    // same price. It rejects thinkingConfig outright (WebSocket 1007), so
+    // thinkingLevel must be 'none' — VoiceCommon still defaults to MINIMAL
+    // for consumers that have not migrated.
+    liveModel: GEMINI_LIVE_MODEL,
+    thinkingLevel: GEMINI_LIVE_THINKING_LEVEL,
     onToolCall: async (name: string, args: Record<string, unknown>): Promise<string> => {
       console.log('[CarBot] tool call:', name, args);
       try {
