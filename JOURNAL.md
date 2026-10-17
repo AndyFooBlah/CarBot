@@ -28,3 +28,19 @@ Entries before 2026-10-17 were backfilled from git history and session memory. T
 - 2026-09-19T18:36Z [step] Live sessions moved to `gemini-3.8-live` (stable, same price).
 - 2026-10-17T04:46Z [learning] Two standing traps here. CarBot has **two** Live paths — `useCarbotSession.ts` through voice-common, and `src/services/voicePreview.ts` which calls `ai.live.connect` directly for the settings voice audition — and the second is easy to miss on a model migration. And the tests mock the voice-common module wholesale, so they would not catch a Live config regression at all; weatherbot-app's `evals/` is the only real Live coverage in the family.
 - 2026-10-17T04:46Z [step] Journal created and backfilled under the new project-journal policy in `~/.claude/CLAUDE.md`.
+
+## 2026-10-16: correction to this journal's own timestamps
+
+- 2026-10-16T22:08Z [incident] **Every timestamp in the sections above is seven hours early and is
+  NOT UTC** — both the `~`-marked backfill and the 2026-09-18/19 migration entries, which were taken
+  from the same source. They came from `git log --date=format:'%Y-%m-%dT%H:%MZ'`, which renders each
+  commit in its own local zone (here PDT, UTC-7) and then has a literal `Z` appended by the format
+  string. The `Z` is wrong. Add seven hours to every entry above this line. Concretely, the Live
+  model migration entry reads `2026-09-19T11:36Z` but commit 5fa9873 is actually
+  **2026-09-19T18:36Z** — which is also how the same change is dated in weatherbot-app's journal, so
+  the two repos currently disagree about the same afternoon. weatherbot-app is the correct one.
+- 2026-10-16T22:08Z [learning] Use `TZ=UTC git log --date=format-local:'%Y-%m-%dT%H:%MZ'` for a UTC
+  backfill — `format-local`, not `format`. Appending a literal `Z` to a local-time format produces
+  timestamps that look authoritative and are silently wrong, which is worse than no timezone at all.
+- 2026-10-16T22:08Z [decision] Corrected by appending rather than rewriting, per the append-only
+  rule.
