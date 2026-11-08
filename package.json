@@ -21,7 +21,7 @@
     "@andyfooblah/voice-common": "^0.15.0",
     "@google/genai": "^2.22.0",
     "firebase": "^12.9.0",
-    "pdfjs-dist": "^4.10.38",
+    "pdfjs-dist": "^6.4.299",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-router-dom": "^7.18.3"
