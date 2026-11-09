@@ -19,7 +19,7 @@
     "googleapis": "^180.0.0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.5",
+    "@eslint/js": "^10.0.1",
     "@types/node": "^26.6.6",
     "eslint": "^9.39.5",
     "globals": "^17.14.0",
