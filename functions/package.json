@@ -26,5 +26,10 @@
     "typescript": "~5.8.2",
     "typescript-eslint": "^8.72.1"
   },
-  "private": true
+  "private": true,
+  "overrides": {
+    "minimatch": "^11.0.5",
+    "glob": "^14.0.4",
+    "uuid": "^11.1.1"
+  }
 }
