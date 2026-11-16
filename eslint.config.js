@@ -70,6 +70,11 @@ export default [
   },
   {
     files: ['src/__tests__/**/*.{ts,tsx}', 'src/__mocks__/**/*.{ts,tsx}'],
+    // Tests run under Node (vitest), and some read repo files or the
+    // environment (`__dirname`, `process`).
+    languageOptions: {
+      globals: { ...globals.node },
+    },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
     },

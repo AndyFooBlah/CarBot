@@ -30,6 +30,7 @@
 
 import { onCall, CallableRequest, HttpsError } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { logger } from 'firebase-functions';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { geminiApiKey } from './memoryExtraction';
 import { generateCleanTranscript } from './cleanTranscript';
@@ -49,6 +50,20 @@ import { emailDisabledMessage, emailFeaturesEnabled } from './emailFlag';
 // Scheduled: clean transcripts missed by onSessionCompleted
 // ---------------------------------------------------------------------------
 
+/**
+ * The nightly tasks, in the order dailyDataCleanup runs them. The three
+ * session tasks query `sessions` across all users by `status` + `startTime`,
+ * which needs the composite index `sessions (status ASC, startTime ASC)` in
+ * firestore.indexes.json (#73).
+ */
+const DAILY_CLEANUP_TASKS = [
+  'repairMissedTranscripts',
+  'repairMissedMemories',
+  'cleanStaleActiveSessions',
+  'cleanWikipediaCache',
+  'enforceAudioRetention',
+] as const;
+
 export const dailyDataCleanup = onSchedule(
   {
     schedule: '0 11 * * *', // 3 AM Pacific (UTC-8) = 11 AM UTC
@@ -61,6 +76,7 @@ export const dailyDataCleanup = onSchedule(
     console.log('[dailyDataCleanup] Starting');
     const db = getFirestore();
 
+    // Order matters: results[i] is reported under DAILY_CLEANUP_TASKS[i].
     const results = await Promise.allSettled([
       repairMissedTranscripts(db),
       repairMissedMemories(db),
@@ -69,20 +85,35 @@ export const dailyDataCleanup = onSchedule(
       enforceAudioRetention(db),
     ]);
 
+    const failed: string[] = [];
     for (const [i, result] of results.entries()) {
-      const names = [
-        'repairMissedTranscripts',
-        'repairMissedMemories',
-        'cleanStaleActiveSessions',
-        'cleanWikipediaCache',
-        'enforceAudioRetention',
-      ];
+      const task = DAILY_CLEANUP_TASKS[i];
       if (result.status === 'rejected') {
-        console.error(`[dailyDataCleanup] ${names[i]} failed:`, result.reason);
+        failed.push(task);
+        // logger.error, not console.error: a multi-line console payload
+        // reaches Cloud Logging with no severity, which hid three failing
+        // tasks from every `severity>=ERROR` query for a month (#73).
+        const reason: unknown = result.reason;
+        logger.error(`[dailyDataCleanup] ${task} failed`, {
+          task,
+          error: reason instanceof Error ? reason.message : String(reason),
+          stack: reason instanceof Error ? reason.stack : undefined,
+        });
+      } else {
+        logger.info(`[dailyDataCleanup] ${task} succeeded`, { task });
       }
     }
 
-    console.log('[dailyDataCleanup] Done');
+    const summary = {
+      succeeded: results.length - failed.length,
+      failed: failed.length,
+      failedTasks: failed,
+    };
+    if (failed.length > 0) {
+      logger.error(`[dailyDataCleanup] Done: ${failed.length} of ${results.length} tasks failed`, summary);
+    } else {
+      logger.info(`[dailyDataCleanup] Done: all ${results.length} tasks succeeded`, summary);
+    }
   },
 );
 
@@ -235,7 +266,10 @@ async function repairMissedTranscripts(db: ReturnType<typeof getFirestore>): Pro
       await generateCleanTranscript(sessionDoc.id);
       repaired++;
     } catch (err) {
-      console.error(`[repairMissedTranscripts] Failed for ${sessionDoc.id}:`, err);
+      logger.error(`[repairMissedTranscripts] Failed for ${sessionDoc.id}`, {
+        sessionId: sessionDoc.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -266,7 +300,10 @@ async function repairMissedMemories(db: ReturnType<typeof getFirestore>): Promis
       await extractMemoriesFromSession(sessionDoc.id);
       repaired++;
     } catch (err) {
-      console.error(`[repairMissedMemories] Failed for ${sessionDoc.id}:`, err);
+      logger.error(`[repairMissedMemories] Failed for ${sessionDoc.id}`, {
+        sessionId: sessionDoc.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
