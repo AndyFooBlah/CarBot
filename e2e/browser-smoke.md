@@ -46,7 +46,7 @@ that needs mic. Read-only audit can't exercise it.
 - `Delete`, `Remove`, `Clear`, `Revoke`
 - `Start session`, `Begin`, `Record`
 - `Retry`, `Re-run`, `Regenerate` on diagnostics (these call paid Gemini APIs)
-- `Send summary email` (spends Gmail quota)
+- `Send summary email` (spends Gmail quota; hidden while email features are off — `EMAIL_FEATURES_ENABLED=false` in `functions/.env`)
 - `Save`, `Submit`, `Apply` on settings
 - `Sign out`
 

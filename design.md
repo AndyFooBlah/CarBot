@@ -307,6 +307,15 @@ Speaker labels use child's name if configured in user profile; otherwise generic
 
 ### 4.5 Gmail Integration — Inbound
 
+> **Status: disabled since 2026-11-15** (owner decision, issue #36). Sections 4.5 and 4.6 describe the design when email is on. Both are gated by one switch, `EMAIL_FEATURES_ENABLED` in `functions/.env` (default and current value `false`), read by `functions/src/emailFlag.ts`:
+>
+> - **Inbound:** `ingestEmailsScheduled` is exported from `index.ts` only when the flag is `true`, so while it is off neither the function nor its Cloud Scheduler job is deployed. firebase-tools does not pass dotenv values to the process that discovers which functions to deploy, so the export decision reads `functions/.env` directly (`emailFeaturesEnabledAtLoad`). `ingestEmails()` also returns immediately if called with the flag off.
+> - **Outbound:** `sendSessionSummaryEmail` logs one line and returns before any Firestore, Gemini or Gmail call; the other two `onSessionCompleted` tasks are unaffected. The `sendSummaryEmailForSession` callable returns `{ success: false, disabled: true }`.
+> - **Client:** `vite.config.ts` reads the same line and injects it as a build-time constant (`EMAIL_FEATURES_ENABLED` in `src/config/features.ts`); Settings shows "Currently off" in place of the recap-email toggle and Diagnostics hides "Re-send summary email".
+> - **Kept:** the code, the Gmail secrets, `users.emailSummariesEnabled`, and existing `emails/` and email-sourced `context_documents/`.
+>
+> Re-enable steps are in the README, "Email (currently disabled)".
+
 Architecture: A scheduled Cloud Function runs every 15 minutes (or can be manually triggered):
 
 1. Authenticate with Gmail API using OAuth2 credentials stored in Cloud Function secrets

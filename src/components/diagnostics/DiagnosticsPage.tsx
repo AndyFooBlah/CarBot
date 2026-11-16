@@ -31,6 +31,7 @@ import { searchWikipedia, getJoke } from '@andyfooblah/knowledge-common';
 import { proxySearchPlace, proxyGetWeather, proxyGetDistanceBetweenPlaces } from '../../services/geoProxy';
 import { mintGeminiLiveToken } from '../../services/geminiBroker';
 import { getVoiceQuotaStatus, type VoiceQuotaCheckResult } from '../../services/voiceQuota';
+import { EMAIL_FEATURES_ENABLED } from '../../config/features';
 import {
   callCleanTranscriptForSession,
   callExtractMemoriesForSession,
@@ -316,12 +317,18 @@ function SessionActions({ uid }: { uid: string }) {
                 result={results.memories ?? null}
                 onClick={() => runAction('memories', () => callExtractMemoriesForSession(sid))}
               />
-              <ActionButton
-                label="Re-send summary email"
-                busy={busyKey === 'email'}
-                result={results.email ?? null}
-                onClick={() => runAction('email', () => callSendSummaryEmailForSession(sid))}
-              />
+              {EMAIL_FEATURES_ENABLED ? (
+                <ActionButton
+                  label="Re-send summary email"
+                  busy={busyKey === 'email'}
+                  result={results.email ?? null}
+                  onClick={() => runAction('email', () => callSendSummaryEmailForSession(sid))}
+                />
+              ) : (
+                <p className="text-xs text-slate-400">
+                  Re-send summary email: unavailable, email features are currently off.
+                </p>
+              )}
             </>
           );
         })()

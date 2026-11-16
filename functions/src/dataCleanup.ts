@@ -43,6 +43,7 @@ import {
   carbotWebUrl,
 } from './sessionSummaryEmail';
 import { enforceAudioRetention } from './dataLifecycle';
+import { emailDisabledMessage, emailFeaturesEnabled } from './emailFlag';
 
 // ---------------------------------------------------------------------------
 // Scheduled: clean transcripts missed by onSessionCompleted
@@ -154,6 +155,10 @@ export const extractMemoriesForSession = onCall(
 /**
  * Manually re-send the session summary email for one session. Used by the
  * diagnostics page to retry a failed email delivery.
+ *
+ * While email features are off (EMAIL_FEATURES_ENABLED, issue #36) it sends
+ * nothing and returns `{ success: false, disabled: true }`; the diagnostics
+ * page hides its button in that state.
  */
 export const sendSummaryEmailForSession = onCall(
   {
@@ -171,6 +176,11 @@ export const sendSummaryEmailForSession = onCall(
   },
   async (request: CallableRequest) => {
     if (!request.auth) throw new HttpsError('unauthenticated', 'Authentication required.');
+
+    if (!emailFeaturesEnabled()) {
+      console.log(emailDisabledMessage('manual summary email re-send'));
+      return { success: false, disabled: true };
+    }
 
     const { sessionId } = request.data as { sessionId: string };
     if (!sessionId || typeof sessionId !== 'string') {

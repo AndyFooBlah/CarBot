@@ -50,11 +50,16 @@
  *   CARBOT_EMAIL_ADDRESS
  *
  * Schedule: every 15 minutes via Cloud Scheduler (configured in index.ts).
+ *
+ * Currently disabled: with EMAIL_FEATURES_ENABLED off (functions/.env, see
+ * emailFlag.ts) the scheduled function is not deployed at all, and
+ * ingestEmails() returns immediately if it is called anyway.
  */
 
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { google } from 'googleapis';
 import { gmailClientId, gmailClientSecret, gmailRefreshToken, carbotEmailAddress } from './sessionSummaryEmail';
+import { emailDisabledMessage, emailFeaturesEnabled } from './emailFlag';
 
 /** Firestore document that stores polling state. */
 const POLLING_STATE_DOC = 'system/gmailPollingState';
@@ -187,6 +192,11 @@ function titleFromSubject(subject: string): string {
  * Poll Gmail for new messages and ingest them as context documents.
  */
 export async function ingestEmails(): Promise<void> {
+  if (!emailFeaturesEnabled()) {
+    console.log(emailDisabledMessage('Gmail inbox poll'));
+    return;
+  }
+
   const db = getFirestore();
   const gmail = createGmailClient();
   const carbotEmail = carbotEmailAddress.value();

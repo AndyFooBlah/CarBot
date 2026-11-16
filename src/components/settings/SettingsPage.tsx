@@ -31,6 +31,7 @@ import { useUserProfile } from '../../hooks/useUserProfile';
 import { previewVoice } from '../../services/voicePreview';
 import { invokeGemini, GEMINI_FLASH_MODEL } from '../../services/geminiBroker';
 import { KID_SAFETY_SETTINGS } from '../../services/promptSafety';
+import { EmailSummariesControl } from './EmailSummariesControl';
 import {
   saveRoutine,
   saveLocations,
@@ -595,15 +596,7 @@ export function SettingsPage() {
           />
         </Field>
         <Field label="Session summary emails">
-          <label className="flex items-center gap-3 cursor-pointer">
-            <button
-              onClick={() => setEmailSummaries(!emailSummaries)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${emailSummaries ? 'bg-blue-600' : 'bg-slate-300'}`}
-            >
-              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${emailSummaries ? 'translate-x-6' : 'translate-x-1'}`} />
-            </button>
-            <span className="text-sm text-slate-600">{emailSummaries ? 'Enabled' : 'Disabled'}</span>
-          </label>
+          <EmailSummariesControl value={emailSummaries} onChange={setEmailSummaries} />
         </Field>
         <button
           onClick={handleSaveProfile}

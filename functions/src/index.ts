@@ -23,10 +23,14 @@
  *       1. extractMemoriesFromSession  — extract facts + generate summary
  *       2. generateCleanTranscript     — AI-cleaned, labeled transcript
  *       3. sendSessionSummaryEmail     — friendly email recap to parent
+ *                                        (logged no-op while email is off)
  *
  *   ingestEmailsScheduled (Cloud Scheduler, every 15 minutes)
  *     Polls the CarBot Gmail inbox and converts emails from registered
- *     users into active context documents.
+ *     users into inactive context documents for a parent to review.
+ *     Exported ONLY when EMAIL_FEATURES_ENABLED=true in functions/.env;
+ *     email is currently off (issue #36), so neither the function nor its
+ *     Cloud Scheduler job is deployed. See emailFlag.ts.
  */
 
 import { initializeApp } from 'firebase-admin/app';
@@ -51,6 +55,7 @@ import {
   carbotEmailAddress,
   carbotWebUrl,
 } from './sessionSummaryEmail';
+import { emailFeaturesEnabledAtLoad } from './emailFlag';
 
 export { geoProxy } from './geoProxy';
 export { cacheWikipediaArticle } from './cacheWikipedia';
@@ -157,9 +162,18 @@ export const onSessionCompleted = onDocumentUpdated(
 
 /**
  * Scheduled function: polls CarBot's Gmail inbox every 15 minutes.
- * Converts emails from registered users into active context documents.
+ * Converts emails from registered users into inactive context documents.
+ *
+ * Deployed only when email features are on. With the flag off the export is
+ * `undefined`, which firebase-functions skips, so no function and no Cloud
+ * Scheduler job exist (rather than a job firing a no-op every 15 minutes).
+ *
+ * Turning the flag OFF on a project where this is already deployed needs one
+ * manual step, because the CI deploy is non-interactive and will not delete
+ * functions: `firebase functions:delete ingestEmailsScheduled --region
+ * us-central1` (README, "Email (currently disabled)").
  */
-export const ingestEmailsScheduled = onSchedule(
+export const ingestEmailsScheduled = !emailFeaturesEnabledAtLoad() ? undefined : onSchedule(
   {
     schedule: 'every 15 minutes',
     secrets: [

@@ -12,12 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import fs from 'fs';
 import path from 'path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { emailFeaturesEnabledAtLoad } from './functions/src/emailFlag';
+
+// The one email switch is EMAIL_FEATURES_ENABLED in functions/.env (issue
+// #36). The web build reads the same line the Cloud Functions deploy does, so
+// the UI and the backend cannot disagree. See src/config/features.ts.
+const emailFeaturesEnabled = emailFeaturesEnabledAtLoad(process.env, () =>
+  fs.readFileSync(path.resolve(__dirname, 'functions/.env'), 'utf8'),
+);
 
 export default defineConfig({
+  define: {
+    __EMAIL_FEATURES_ENABLED__: JSON.stringify(emailFeaturesEnabled),
+  },
   server: {
     port: 3004,
     host: '0.0.0.0',

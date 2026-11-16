@@ -33,15 +33,35 @@
  *   To:   User's registered Firebase Auth email
  *   Subject: CarBot recap: [date] — [one-line summary]
  *   Body: Plain-text summary + link to transcript
+ *
+ * Currently disabled: every email path is gated on EMAIL_FEATURES_ENABLED
+ * (functions/.env, see emailFlag.ts). With the flag off this function logs
+ * one line and returns before any Firestore, Gemini or Gmail call.
  */
 
 import { getFirestore } from 'firebase-admin/firestore';
 import { google } from 'googleapis';
-import { defineSecret } from 'firebase-functions/params';
+import { defineBoolean, defineSecret } from 'firebase-functions/params';
 import { geminiApiKey } from './memoryExtraction';
 import { FLASH_MODEL } from './models';
 import { KID_SAFETY_SETTINGS } from './safety';
 import type { SessionDocument, UserDocument, TranscriptEntry } from './types';
+import { EMAIL_FLAG, emailDisabledMessage, emailFeaturesEnabled } from './emailFlag';
+
+/**
+ * Declares the email switch as a functions param so it shows up in the
+ * deployed configuration and firebase-tools refuses a deploy that has no
+ * value for it. The value comes from `functions/.env`; code reads it through
+ * emailFlag.ts (same environment variable) so the check also works at
+ * module load, where `param.value()` is not allowed.
+ */
+export const emailFeaturesParam = defineBoolean(EMAIL_FLAG, {
+  default: false,
+  label: 'Email features enabled',
+  description:
+    'Single switch for Gmail inbox ingestion and session recap emails. ' +
+    'Off since 2026-11-15 (issue #36). Set in functions/.env.',
+});
 
 export const gmailClientId = defineSecret('GMAIL_CLIENT_ID');
 export const gmailClientSecret = defineSecret('GMAIL_CLIENT_SECRET');
@@ -106,6 +126,11 @@ function createGmailClient() {
  * Generate a session summary and send it to the user's email.
  */
 export async function sendSessionSummaryEmail(sessionId: string): Promise<void> {
+  if (!emailFeaturesEnabled()) {
+    console.log(emailDisabledMessage(`summary email for session ${sessionId}`));
+    return;
+  }
+
   const db = getFirestore();
 
   // Fetch session and user

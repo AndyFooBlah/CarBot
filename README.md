@@ -1,6 +1,6 @@
 # CarBot
 
-A voice-first AI companion for car rides with kids. CarBot turns everyday drives into engaging conversations — answering questions, telling jokes, exploring topics, and building a memory of the family over time. Parents receive a friendly email recap after each session.
+A voice-first AI companion for car rides with kids. CarBot turns everyday drives into engaging conversations — answering questions, telling jokes, exploring topics, and building a memory of the family over time. Recap emails to parents and email forwarding are built but [currently switched off](#email-currently-disabled).
 
 Built on [`@andyfooblah/voice-common`](https://github.com/AndyFooBlah/VoiceCommon) (voice infrastructure) and [`@andyfooblah/knowledge-common`](https://github.com/AndyFooBlah/KnowledgeCommon) (knowledge tools).
 
@@ -11,8 +11,8 @@ Built on [`@andyfooblah/voice-common`](https://github.com/AndyFooBlah/VoiceCommo
 - **Live voice sessions** — Talk to CarBot hands-free during a car ride. Powered by the Gemini Live API with real-time audio streaming.
 - **Trip-aware context** — CarBot knows whether it's a morning school commute, afternoon pickup, or weekend trip, and adjusts accordingly.
 - **Memory across sessions** — Facts, interests, upcoming events, and preferences mentioned in conversations are extracted and remembered for next time.
-- **Context documents** — Parents can upload school newsletters, permission slips, or any text they want CarBot to know about. Emails forwarded to CarBot's Gmail address arrive as *inactive* context documents for the parent to review and switch on.
-- **Session recap emails** — After each session, CarBot emails the parent a warm summary of what was talked about, with a link to the full transcript.
+- **Context documents** — Parents can upload school newsletters, permission slips, or any text they want CarBot to know about. *(Currently off — see [Email](#email-currently-disabled).)* Emails forwarded to CarBot's Gmail address arrive as *inactive* context documents for the parent to review and switch on.
+- **Session recap emails** *(currently off — see [Email](#email-currently-disabled))* — After each session, CarBot emails the parent a warm summary of what was talked about, with a link to the full transcript.
 - **Transcript editing** — Both the raw and AI-cleaned transcript can be corrected after the fact. All edits are versioned; originals are never overwritten.
 - **Memory browser** — Browse, edit, or delete any fact CarBot has remembered about the family.
 
@@ -43,10 +43,13 @@ Built on [`@andyfooblah/voice-common`](https://github.com/AndyFooBlah/VoiceCommo
 │  onSessionCompleted (Firestore trigger)                         │
 │    ├── extractMemoriesFromSession()  — Gemini → memory facts    │
 │    ├── generateCleanTranscript()     — Gemini → cleaned text    │
-│    └── sendSessionSummaryEmail()     — Gemini → Gmail recap     │
+│    └── sendSessionSummaryEmail()     — Gemini → Gmail recap (*) │
 │                                                                 │
-│  ingestEmailsScheduled (every 15 min)                           │
+│  ingestEmailsScheduled (every 15 min) (*)                       │
 │    └── ingestEmails()                — Gmail → context docs     │
+│                                                                 │
+│  (*) off while EMAIL_FEATURES_ENABLED=false: recap is a logged  │
+│      no-op, ingestEmailsScheduled is not deployed               │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -102,6 +105,7 @@ carbot/
 │       ├── cleanTranscript.ts    # AI transcript cleaning + speaker labels
 │       ├── sessionSummaryEmail.ts # Session recap email via Gmail API
 │       ├── emailIngestion.ts     # Gmail inbox polling
+│       ├── emailFlag.ts          # EMAIL_FEATURES_ENABLED switch (reads functions/.env)
 │       └── types.ts              # Shared Cloud Function types
 ├── firestore.rules               # Firestore security rules
 ├── storage.rules                 # Cloud Storage security rules
@@ -174,7 +178,7 @@ Enable the following in the [Google Cloud Console](https://console.cloud.google.
 - **Firebase Authentication** — enable Google and Email/Password providers
 - **Cloud Firestore** — create a database (production mode)
 - **Cloud Storage** — default bucket is fine
-- **Gmail API** — needed for sending recap emails and inbox polling
+- **Gmail API** — needed for sending recap emails and inbox polling (only if you turn [email](#email-currently-disabled) on)
 
 ### 3. Environment variables
 
@@ -202,6 +206,8 @@ See the "Security" section below and Step 4c for secret setup instructions.
 
 ### 4. Gmail OAuth2 credentials
 
+> Email features ship **off** (`EMAIL_FEATURES_ENABLED=false` in `functions/.env`). The five Gmail/CarBot secrets below must still exist in Secret Manager, because `onSessionCompleted` and `sendSummaryEmailForSession` bind them and a deploy fails on a missing secret; placeholder values are enough while email is off. Real credentials are only needed to turn email on — see [Email (currently disabled)](#email-currently-disabled).
+
 CarBot uses a dedicated Gmail account to send recap emails and receive forwarded context emails. You need OAuth2 credentials with a refresh token stored in Firebase Secret Manager.
 
 **4a. Create OAuth2 credentials**
@@ -213,6 +219,8 @@ CarBot uses a dedicated Gmail account to send recap emails and receive forwarded
 **4b. Obtain a refresh token**
 
 Use the [OAuth2 Playground](https://developers.google.com/oauthplayground/) or a script to authorize the CarBot Gmail account and capture the refresh token. The required scope is `https://www.googleapis.com/auth/gmail.modify`.
+
+Publish the OAuth app first (Google Auth Platform → Audience → **Publish app**, so the publishing status is "In production"). While the status is "Testing", Google expires the refresh token 7 days after consent, and every Gmail call then fails with `invalid_grant` (this is what happened in issue #36).
 
 **4c. Store secrets in Firebase Secret Manager**
 
@@ -337,13 +345,48 @@ You can view, edit, or delete memories in the **Memories** tab.
 
 ---
 
-## How email works
+## Email (currently disabled)
+
+**Status: off since 2026-11-15, by owner decision** ("I think we can disable Carbot emailing for now", [issue #36](https://github.com/AndyFooBlah/CarBot/issues/36)). The Gmail OAuth refresh token expired around 2026-09-09 and the 15-minute inbox poll had been failing with `invalid_grant` ever since. Nothing was deleted: the code, the Gmail secrets in Secret Manager, each user's `emailSummariesEnabled` preference, and existing email-sourced context documents are all still there.
+
+One switch controls everything — `EMAIL_FEATURES_ENABLED` in [`functions/.env`](functions/.env) (committed; not a secret):
+
+| | `false` (now) | `true` |
+|---|---|---|
+| `ingestEmailsScheduled` + its Cloud Scheduler job | not deployed | deployed, polls Gmail every 15 min |
+| Recap email after a session (`onSessionCompleted`) | logs `[email] EMAIL_FEATURES_ENABLED is off — skipping …` and returns; memory extraction and the clean transcript run as usual | sent via Gmail |
+| `sendSummaryEmailForSession` callable | returns `{ success: false, disabled: true }` | re-sends the recap |
+| Settings → Profile → Session summary emails | "Currently off" notice | per-user toggle |
+| Diagnostics → Re-send summary email | hidden | shown |
+
+The Cloud Functions read the flag through `functions/src/emailFlag.ts`; the web build reads the same line in `vite.config.ts` (exposed to the app as `EMAIL_FEATURES_ENABLED` in `src/config/features.ts`), so the UI and backend cannot disagree.
+
+### Re-enabling email
+
+1. **Publish the OAuth app.** In the Google Cloud console for the project: Google Auth Platform → Audience → **Publish app**, so the publishing status is "In production" rather than "Testing". In "Testing", refresh tokens for the Gmail scope expire 7 days after consent ([Google's documentation](https://developers.google.com/identity/protocols/oauth2#expiration)), which is how this broke. With only CarBot's own Gmail account consenting, the app does not need Google's verification review (the consent screen shows an "unverified app" warning).
+2. **Re-run the Gmail OAuth consent** as the CarBot Gmail account (step 4b under Setup; scope `https://www.googleapis.com/auth/gmail.modify`) and store the new refresh token:
+   ```bash
+   firebase functions:secrets:set GMAIL_REFRESH_TOKEN
+   ```
+3. **Flip the flag**: set `EMAIL_FEATURES_ENABLED=true` in `functions/.env`.
+4. **Deploy**: commit and push to `main` (CI deploys functions and hosting), or from the repo root `npm run build && firebase deploy --only functions,hosting`. The deploy creates `ingestEmailsScheduled` and its scheduler job.
+5. **Verify**: `gcloud scheduler jobs list --project <project> --location us-central1` shows `firebase-schedule-ingestEmailsScheduled-us-central1`; within 15 minutes the function logs `[emailIngestion] No new messages to process` (or `Processing N messages`) and no `invalid_grant`; Settings shows the toggle again.
+
+### Disabling it again
+
+Set the flag back to `false`, then delete the scheduled function **before** pushing — the CI deploy is non-interactive and aborts rather than delete a function that has left the source:
+
+```bash
+firebase functions:delete ingestEmailsScheduled --region us-central1
+```
+
+### How it works when on
 
 **Inbound** — Forward any email to CarBot's Gmail address and it becomes a context document. Forwarded email is third-party text, so it arrives **inactive**: the Context page shows an "N new documents to review" badge, and nothing reaches the child's prompt until you turn the document on. Useful for school newsletters, event announcements, or anything you want CarBot to know about.
 
 **Outbound** — After each session, CarBot emails you a friendly recap summarizing what was talked about, memorable moments, and any dates or plans mentioned. Includes a link to the full transcript.
 
-Email summaries can be disabled in **Settings → Profile**.
+Each parent can turn the recap email off for their own account in **Settings → Profile**.
 
 ---
 

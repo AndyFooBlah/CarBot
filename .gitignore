@@ -10,6 +10,10 @@ functions/lib/
 .env
 .env.local
 .env.production
+# Exception: functions/.env is committed. It holds only non-secret function
+# config (the EMAIL_FEATURES_ENABLED switch) that the non-interactive CI
+# deploy and the web build both read. Secrets go in Secret Manager, never here.
+!functions/.env
 
 # Firebase local state
 .firebase/
