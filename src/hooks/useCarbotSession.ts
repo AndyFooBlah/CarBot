@@ -30,7 +30,6 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSession } from '@andyfooblah/voice-common';
 import type { UseSessionReturn } from '@andyfooblah/voice-common';
 import {
-  allKnowledgeTools,
   getWeather,
   searchPlace,
   getDistanceBetweenPlaces,
@@ -41,12 +40,8 @@ import {
 } from '@andyfooblah/knowledge-common';
 import { getActiveContextDocuments } from '../services/contextDocuments';
 import { buildCarbotInstruction, getCurrentCity, computeTripContext } from '../services/instructionBuilder';
-import {
-  allMathGameTools,
-  generateMathProblem,
-  checkMathAnswer,
-} from '../services/mathGames';
-import { GEMINI_LIVE_MODEL, GEMINI_LIVE_THINKING_LEVEL } from '../services/geminiBroker';
+import { generateMathProblem, checkMathAnswer } from '../services/mathGames';
+import { carbotLiveSessionOptions } from '../services/liveConfig';
 import { setSessionCarbotFields } from '../services/sessions';
 import { markBotNameIntroduced } from '../services/userProfile';
 import { checkAndReserveVoiceQuota, recordVoiceUsage } from '../services/voiceQuota';
@@ -96,17 +91,11 @@ export function useCarbotSession(options: UseCarbotSessionOptions): UseCarbotSes
   const vcSession = useSession({
     userId,
     systemInstruction,
-    tools: [...allKnowledgeTools, ...allMathGameTools],
-    autoGreetText: '[Session started. Please greet the family and begin the conversation as described in your instructions.]',
-    speechConfig: profile.selectedVoice ? {
-      voiceConfig: { prebuiltVoiceConfig: { voiceName: profile.selectedVoice } },
-    } : undefined,
-    // gemini-3.8-live (stable) replaces gemini-3.1-flash-live-preview at the
-    // same price. It rejects thinkingConfig outright (WebSocket 1007), so
-    // thinkingLevel must be 'none' — VoiceCommon still defaults to MINIMAL
-    // for consumers that have not migrated.
-    liveModel: GEMINI_LIVE_MODEL,
-    thinkingLevel: GEMINI_LIVE_THINKING_LEVEL,
+    // Model, thinking, tools, opening cue and voice: one definition in
+    // services/liveConfig.ts, shared with the tests that send this exact
+    // configuration to the real Live API (`npm run test:live`). Turn-taking is
+    // server VAD with VoiceCommon's defaults, so no turn options are passed.
+    ...carbotLiveSessionOptions(profile),
     onToolCall: async (name: string, args: Record<string, unknown>): Promise<string> => {
       console.log('[CarBot] tool call:', name, args);
       try {

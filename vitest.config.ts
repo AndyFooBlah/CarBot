@@ -28,5 +28,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/__tests__/setup.ts'],
     include: ['src/__tests__/**/*.test.{ts,tsx}'],
+    // *.live.test.ts open real Gemini Live sessions; `npm run test:live` only.
+    exclude: ['**/node_modules/**', 'src/__tests__/live/**/*.live.test.ts'],
   },
 });

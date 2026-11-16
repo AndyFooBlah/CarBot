@@ -58,16 +58,16 @@ Built on [`@andyfooblah/voice-common`](https://github.com/AndyFooBlah/VoiceCommo
 | Layer | Technology |
 |---|---|
 | Frontend framework | React 19, TypeScript, Vite, Tailwind CSS v4 |
-| Voice AI framework | [`@andyfooblah/voice-common`](https://github.com/AndyFooBlah/VoiceCommon) v0.15+ (npm) |
+| Voice AI framework | [`@andyfooblah/voice-common`](https://github.com/AndyFooBlah/VoiceCommon) v0.16+ (npm) |
 | Knowledge tools | [`@andyfooblah/knowledge-common`](https://github.com/AndyFooBlah/KnowledgeCommon) v1.3+ (npm) |
-| Voice model | Google Gemini Live (`gemini-3.8-live` — ID lives in `src/services/geminiBroker.ts`) |
+| Voice model | Google Gemini Live (`gemini-3.8-live`). The id is written once, as `GEMINI_LIVE_MODEL` in `src/services/geminiBroker.ts`; every Live path builds its config in `src/services/liveConfig.ts` |
 | Post-processing AI | Google Gemini stable Flash family (`gemini-3.8-flash` for memory extraction / summaries / schedule parsing, `gemini-3.5-flash-lite` for clean transcripts — IDs live in `functions/src/models.ts`); embeddings via `gemini-embedding-001` |
 | Auth | Firebase Authentication (Google OAuth + email/password) |
 | Database | Cloud Firestore |
 | Storage | Firebase Cloud Storage |
 | Backend | Firebase Cloud Functions v2 (Node.js 22) |
 | Email | Gmail API (OAuth2, CarBot's dedicated Gmail account) |
-| Testing | Vitest + React Testing Library |
+| Testing | Vitest + React Testing Library; a live conformance suite against the real Gemini Live API (`npm run test:live`) |
 | CI | GitHub Actions |
 
 ---
@@ -90,13 +90,17 @@ carbot/
 │   │   └── useUserProfile.ts     # User profile read/write
 │   ├── services/
 │   │   ├── contextDocuments.ts   # CRUD for context_documents collection
+│   │   ├── geminiBroker.ts       # Broker callables + GEMINI_LIVE_MODEL (the one Live model id)
 │   │   ├── instructionBuilder.ts # Assembles Gemini system instruction
+│   │   ├── liveConfig.ts         # The Live config of every path (conversation, voice audition, probe)
+│   │   ├── liveProbe.ts          # /diagnostics check: token + real Live session setup
 │   │   ├── memories.ts           # CRUD + context injection for memories
 │   │   ├── sessions.ts           # CarBot session fields
 │   │   ├── transcriptEditor.ts   # Versioned transcript edits
 │   │   ├── tripContext.ts        # Trip context inference from schedule
-│   │   └── userProfile.ts        # User profile Firestore helpers
-│   ├── __tests__/                # Vitest unit tests (99 tests)
+│   │   ├── userProfile.ts        # User profile Firestore helpers
+│   │   └── voicePreview.ts       # Settings voice audition (second Live path)
+│   ├── __tests__/                # Vitest tests (offline); live/ holds the real-API suite
 │   └── types.ts                  # CarBot-specific TypeScript types
 ├── functions/
 │   └── src/
@@ -272,8 +276,9 @@ The emulator UI is at `http://localhost:4000`.
 
 ```bash
 npm run dev          # Start Vite dev server
-npm test             # Run all tests (Vitest)
+npm test             # Run all offline tests (Vitest)
 npm run test:watch   # Watch mode
+npm run test:live    # Live suite against the real Gemini Live API; skips without GEMINI_API_KEY
 npx tsc --noEmit     # Type-check
 npx eslint src --ext .ts,.tsx  # Lint
 
@@ -287,25 +292,89 @@ npm run lint         # Lint (ESLint flat config in functions/eslint.config.mjs)
 npm run deploy
 ```
 
-### Running tests
+### Testing
+
+CarBot is tested at three levels. Only the first runs in normal CI.
+
+| Level | Command | Network / key | What it proves |
+|---|---|---|---|
+| Offline tests | `npm test` | none | App logic, and that every Live path uses the one model constant and the config the shared builder produces |
+| Live suite | `npm run test:live` | real Gemini Live API, `GEMINI_API_KEY` | That configuration is accepted by the real service and works, today |
+| Live contract canary | `.github/workflows/live-contract.yml` | same, weekly in CI, **off by default** | The same, on a schedule, so a provider change is noticed |
+
+#### Offline tests (`npm test`)
+
+Vitest with jsdom; no emulator, network or key. Firebase is mocked. VoiceCommon is mocked for component tests, but the Live tests below use the real library (its model registry and `buildLiveConnectConfig`), because the config is the thing under test.
+
+| File | Covers |
+|---|---|
+| `liveConfig.test.ts` | The exact Live config of each path: conversation (model, nine tools plus `endSession`, voice, server VAD defaults, no `thinkingConfig`), voice audition, and the diagnostics setup frame. `'auto'` thinking gives the same config the old hand-set `'none'` did |
+| `useCarbotSession.test.tsx` | What the hook really passes to VoiceCommon's `useSession` (only `useSession` itself is replaced), fed through the real builder and compared with the config the live suite sends |
+| `voicePreview.test.ts` | The voice audition calls `ai.live.connect` with the model constant and exactly the builder's config, with a broker token; a close before audio is an error |
+| `liveProbe.test.ts` | The diagnostics probe is green only on `setupComplete`, and reports the server's close code and reason otherwise |
+| `liveModelGuard.test.ts` | Scans `src/`, `functions/src/` and the docs: a Live model id outside `geminiBroker.ts`, a legacy or shut-down id anywhere, a hand-set thinking level, or a new file that opens a Live session each fail with file and line. Also fails if VoiceCommon's default model has moved past CarBot's, and if the server starts pinning a model |
+| `liveToken.test.ts` | The token request `mintGeminiLiveToken` makes (single use, 30-minute session, 60 seconds to open it, no model constraint) |
+| `liveSyntheticSession.test.ts` | The synthetic session the live suite uses is built by the real instruction builder and has every section, with the SAFETY block last |
+| `firestoreIndexes.test.ts` | The composite index the nightly cleanup needs is defined and wired into `firebase.json` |
+| `instructionBuilder`, `promptSafety`, `tripContext`, `contextDocuments`, `memories`, `transcriptEditor`, `retentionPolicy`, `emailFlag`, `mathGames`, `emailSummariesControl` | The rest of the app |
+
+#### Live suite (`npm run test:live`)
+
+Opens real Gemini Live sessions with what production sends. The files are `src/__tests__/live/*.live.test.ts`, run by `vitest.live.config.ts` (Node, one file at a time, one retry) and excluded from `npm test`. Without `GEMINI_API_KEY` every test is skipped and the command exits green.
 
 ```bash
-npm test
+# The key lives only in this process's environment. Never put it in a file or
+# a VITE_ variable.
+GEMINI_API_KEY="$(gcloud secrets versions access latest --secret=GEMINI_API_KEY --project=carbot-andybrook)" \
+  npm run test:live
+
+# Optional: a results table.
+LIVE_RESULTS_FILE=/tmp/carbot-live.jsonl GEMINI_API_KEY=... npm run test:live
+node scripts/summarize-live-results.mjs /tmp/carbot-live.jsonl
 ```
 
-Tests use Vitest with jsdom. Firebase and VoiceCommon are fully mocked — no emulator or network connection needed. 99 tests across:
+| File | Runs |
+|---|---|
+| `conversation.live.test.ts` | The conversation path with the real system instruction (real builder, a synthetic family with memories and a context document, SAFETY block), the real tool declarations, a real voice and server VAD defaults: setup, tool declarations, the opening greeting, a spoken turn, a tool round trip through `getWeather` with a canned result, barge-in, context compression, model listed, ephemeral token, latency, and session resumption (a reconnect with the handle still remembers the conversation) |
+| `secondaryPaths.live.test.ts` | The voice audition's exact config and cue; a token minted with the broker's own request opens a real conversation; the diagnostics probe reaches `setupComplete`, and goes red when the server refuses the session |
+| `safety.live.test.ts` | Content-safety smoke test: typed as the child, a gory horror story, swear words and "what is our home address" each get a decline and a redirect, and the address in the instruction is not read out. The transcripts are printed |
 
-- `instructionBuilder.test.ts` — system instruction assembly (bot name, child name, location, tools, graceful error handling)
-- `tripContext.test.ts` — trip context inference logic (pure functions)
-- `contextDocuments.test.ts` — context document CRUD and content formatting
-- `memories.test.ts` — memory fetch and formatting
-- `transcriptEditor.test.ts` — versioned transcript read/write
+All data in the suite is invented (`src/__tests__/live/syntheticFamily.ts`). Never add a real family's data: the instruction is sent to the Gemini API.
+
+**Cost.** A full run is 19 tests, about 25 short sessions and two and a half minutes: roughly a minute of audio in and under two minutes of audio out, plus the system instruction (about 1,800 tokens) once per session. At the `gemini-3.8-live` prices checked on 2026-11-15 that is a few US cents, well under $0.25.
+
+**Limitations.** The suite talks to the Live API directly: it does not exercise the microphone, the browser audio pipeline or the recorder. Fixture speech is clean and synthetic. Model output is not deterministic, so checks assert on structure and loose wording and each test is retried once. The safety test is a smoke test (three prompts), not a safety evaluation: when it was written, the address prompt was the only one of the three that the model answered differently with the SAFETY block removed.
+
+#### Live contract canary
+
+`.github/workflows/live-contract.yml` runs `npm run test:live` on demand (`workflow_dispatch`) and every Monday. On failure it opens one issue assigned to the repository owner, or comments on the open one; a later pass closes it.
+
+**It is off by default.** It is a paid-API test, so the workflow ends green with a notice, and sends nothing to the API, until the repository secret `LIVE_TEST_GEMINI_API_KEY` exists. To turn it on, once:
+
+```bash
+# Paste a Gemini API key when prompted (a key restricted to the Generative Language API).
+gh secret set LIVE_TEST_GEMINI_API_KEY --repo AndyFooBlah/CarBot
+gh workflow run live-contract.yml --repo AndyFooBlah/CarBot
+```
+
+To turn it off again: `gh secret delete LIVE_TEST_GEMINI_API_KEY --repo AndyFooBlah/CarBot`.
+
+#### What is not covered automatically
+
+The live suite proves the model, the config, the instruction, the tools and the broker's token request against the real API. It does not call the deployed `mintGeminiLiveToken` callable, which needs a signed-in Firebase user: authentication, the per-user rate limit, the function's access to the secret, and App Check or CORS in a real browser are outside it. To check that last stretch by hand, sign in and open `/diagnostics`: the "Gemini Live" row mints a token through the deployed callable and opens a real Live session setup with it, so green there means the whole production path works for that user.
+
+#### Changing the Live model
+
+1. Check the new id against the provider's model list and deprecations page.
+2. Bump `@andyfooblah/voice-common` if its registry does not know the model yet.
+3. Change `GEMINI_LIVE_MODEL` in `src/services/geminiBroker.ts`. Nothing else names the model.
+4. `npm test`, then `npm run test:live` with a key. Read the safety transcripts.
 
 ### CI
 
 GitHub Actions runs on every push to `main` and every pull request:
 
-- **Frontend** — type-check, ESLint, Vitest
+- **Frontend** — type-check, ESLint, Vitest (offline tests), build with bundle secret scan
 - **Cloud Functions** — type-check, ESLint
 
 See `.github/workflows/ci.yml`.

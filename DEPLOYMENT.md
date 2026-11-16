@@ -69,9 +69,10 @@ Functions calls don't send a browser referrer.
 
 After hosting deploy:
 1. Open the hosting URL, sign in with Google.
-2. Open the diagnostics page; the "Gemini 3.1 Flash Live" probe goes
-   through the server-side broker — a green probe means broker → token
-   mint → Gemini Live are all reachable.
+2. Open the diagnostics page; the "Gemini Live" probe mints a token through
+   the server-side broker and opens a real Live session setup with it for
+   the production model. Green means broker → token mint → Gemini Live
+   setup all work; red shows the server's close code and reason.
 3. Start a voice session; verify it connects.
 4. Verify geo lookups work (ask the bot "where am I?" — it should
    reverse-geocode successfully).

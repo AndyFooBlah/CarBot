@@ -21,14 +21,13 @@
  * PCM audio chunks through Web Audio, then closes the session.
  */
 
-import { GoogleGenAI, Modality } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import { GEMINI_LIVE_MODEL, mintGeminiLiveToken } from './geminiBroker';
-
-/**
- * The audition uses the same Live model as a real session, so a model that
- * works here works there (and vice versa).
- */
-const PREVIEW_MODEL = GEMINI_LIVE_MODEL;
+import {
+  CARBOT_LIVE_API_VERSION,
+  buildVoicePreviewConnectConfig,
+  voicePreviewPrompt,
+} from './liveConfig';
 
 /**
  * Play a short voice preview of the given voice saying "Hi! I'm <botName>."
@@ -44,8 +43,8 @@ export async function previewVoice(
   botName: string,
 ): Promise<void> {
   const { token } = await mintGeminiLiveToken();
-  // Ephemeral token requires v1alpha — see services/geminiBroker.ts for context.
-  const ai = new GoogleGenAI({ apiKey: token, httpOptions: { apiVersion: 'v1alpha' } });
+  // Same API version VoiceCommon's useSession pins for an ephemeral token.
+  const ai = new GoogleGenAI({ apiKey: token, httpOptions: { apiVersion: CARBOT_LIVE_API_VERSION } });
 
   // Web Audio context at 24 kHz to match Gemini Live PCM output rate
   const audioCtx = new AudioContext({ sampleRate: 24000 });
@@ -55,6 +54,7 @@ export async function previewVoice(
 
   return new Promise<void>((resolve, reject) => {
     let closed = false;
+    let gotAudio = false;
     let liveSession: Awaited<ReturnType<typeof ai.live.connect>> | null = null;
 
     const finish = (err?: unknown) => {
@@ -67,24 +67,18 @@ export async function previewVoice(
     };
 
     ai.live.connect({
-      model: PREVIEW_MODEL,
-      config: {
-        systemInstruction: {
-          parts: [{ text: 'You are a friendly AI assistant. Speak naturally and warmly.' }],
-        },
-        responseModalities: [Modality.AUDIO],
-        // NOTE: GEMINI_LIVE_MODEL rejects thinkingConfig (WebSocket 1007).
-        // Do not reintroduce a thinkingLevel here.
-        speechConfig: {
-          voiceConfig: { prebuiltVoiceConfig: { voiceName } },
-        },
-      },
+      // The audition uses the same Live model and config builder as a real
+      // session (services/liveConfig.ts), so a model that works here works
+      // there, and the live suite covers this exact config.
+      model: GEMINI_LIVE_MODEL,
+      config: buildVoicePreviewConnectConfig(voiceName),
       callbacks: {
         onmessage: (msg) => {
           // Play each PCM chunk as it arrives
           if (msg.serverContent?.modelTurn?.parts) {
             for (const part of msg.serverContent.modelTurn.parts) {
               if (part.inlineData?.mimeType?.startsWith('audio/pcm') && part.inlineData.data) {
+                gotAudio = true;
                 const raw = atob(part.inlineData.data);
                 const bytes = new Uint8Array(raw.length);
                 for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
@@ -114,14 +108,19 @@ export async function previewVoice(
           }
         },
         onerror: (err) => finish(err),
-        onclose: () => finish(),
+        // A close before any audio means the audition never played. The
+        // server reports a rejected setup (bad model, bad config, bad voice)
+        // this way, and ai.live.connect() never settles in that case, so
+        // this is the only place the failure can surface.
+        onclose: (event) => {
+          if (gotAudio) finish();
+          else finish(new Error(`Voice preview closed before any audio (code ${event?.code ?? 'unknown'}${event?.reason ? `: ${event.reason}` : ''})`));
+        },
       },
     }).then((session) => {
       liveSession = session;
       // Ask the bot to say the greeting — nothing more
-      session.sendRealtimeInput({
-        text: `Say exactly this, warmly: "Hi! I'm ${botName}."`,
-      });
+      session.sendRealtimeInput({ text: voicePreviewPrompt(botName) });
     }).catch(finish);
   });
 }

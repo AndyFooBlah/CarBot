@@ -17,7 +17,7 @@
  *
  * Sections:
  *   1. External-service probes (Wikipedia, Jokes, geoProxy tools, Firestore,
- *      Gemini Live WebSocket reachability, post-session Gemini models)
+ *      Gemini Live token + session setup, post-session Gemini models)
  *   2. Voice-quota usage for the current UTC day
  *   3. Per-session manual triggers (clean transcript, extract memories,
  *      re-send summary email) for the most recent completed session
@@ -29,7 +29,8 @@ import { db, useAuth, getUserSessions } from '@andyfooblah/voice-common';
 import type { SessionMetadata } from '@andyfooblah/voice-common';
 import { searchWikipedia, getJoke } from '@andyfooblah/knowledge-common';
 import { proxySearchPlace, proxyGetWeather, proxyGetDistanceBetweenPlaces } from '../../services/geoProxy';
-import { mintGeminiLiveToken } from '../../services/geminiBroker';
+import { GEMINI_LIVE_MODEL, mintGeminiLiveToken } from '../../services/geminiBroker';
+import { probeLiveSetup } from '../../services/liveProbe';
 import { getVoiceQuotaStatus, type VoiceQuotaCheckResult } from '../../services/voiceQuota';
 import { EMAIL_FEATURES_ENABLED } from '../../config/features';
 import {
@@ -139,18 +140,15 @@ function ServiceProbes({ uid }: { uid: string | undefined }) {
         if (!uid) throw new Error('not authenticated');
         await getDoc(doc(db, 'users', uid));
       }),
-      probe('Gemini 3.1 Flash Live (WebSocket reachability)', async () => {
-        // Mint an ephemeral token via the server-side broker (same path real
-        // sessions take) and use it to open the Live WebSocket. A green probe
-        // means broker → token mint → Gemini Live are all reachable.
+      probe(`Gemini Live — ${GEMINI_LIVE_MODEL} (token + session setup)`, async () => {
+        // The production path, minus audio: mint an ephemeral token through
+        // the server-side broker, open the Live WebSocket with it, send a
+        // setup for the production model and wait for the server's
+        // setupComplete. Green means broker → token → Live setup all work
+        // for this signed-in user; a rejected setup shows the server's close
+        // code and reason. See services/liveProbe.ts.
         const { token } = await mintGeminiLiveToken();
-        const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${token}`;
-        await new Promise<void>((resolve, reject) => {
-          const ws = new WebSocket(url);
-          const timer = setTimeout(() => { ws.close(); reject(new Error('timeout')); }, 6000);
-          ws.onopen = () => { clearTimeout(timer); ws.close(); resolve(); };
-          ws.onerror = () => { clearTimeout(timer); reject(new Error('WebSocket failed')); };
-        });
+        await probeLiveSetup(token);
       }),
     ]);
     const base = settled.map((s) =>

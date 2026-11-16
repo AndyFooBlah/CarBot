@@ -2,7 +2,7 @@
 
 ## 1. Architecture Overview
 
-CarBot is a React/TypeScript SPA that uses VoiceCommon (`@andyfooblah/voicecommon`) as its core framework. Firebase handles auth, database, and storage. Cloud Functions handle all server-side processing (memory extraction, email, transcript cleaning).
+CarBot is a React/TypeScript SPA that uses VoiceCommon (`@andyfooblah/voice-common`) as its core framework. Firebase handles auth, database, and storage. Cloud Functions handle all server-side processing (memory extraction, email, transcript cleaning).
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -42,15 +42,15 @@ CarBot is a React/TypeScript SPA that uses VoiceCommon (`@andyfooblah/voicecommo
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | VoiceCommon (`@andyfooblah/voicecommon`) |
+| Framework | VoiceCommon (`@andyfooblah/voice-common` 0.16+) |
 | Frontend | React 19, TypeScript, Vite, Tailwind CSS v4 |
-| Voice AI | Google Gemini Live (`gemini-2.5-flash-preview-native-audio-dialog`) |
+| Voice AI | Google Gemini Live (`gemini-3.8-live`; see 7.5) |
 | Auth | Firebase Authentication (Google OAuth) |
 | Database | Cloud Firestore |
 | Storage | Firebase Cloud Storage |
 | Backend | Firebase Cloud Functions v2 (Node.js 22) |
 | Email | Gmail API (service account, CarBot's Gmail) |
-| Testing | Vitest, React Testing Library |
+| Testing | Vitest, React Testing Library; live conformance suite against the real Gemini Live API (see 7.5) |
 | CI | GitHub Actions |
 
 ---
@@ -437,6 +437,25 @@ VoiceCommon's `useSession` is wired up via the `tokenProvider` option of `initia
 
 **K1 — resolved.** KnowledgeCommon (Wikipedia RAG, date-time tools) now receives `{ invokeGemini, embedContent: embedGemini }` via `initializeKnowledgeCommon`, routing all of its Gemini calls through the same server-side brokers. No Gemini key exists in the client bundle; the ESLint `VITE_GEMINI_*` guard and the post-build bundle scanner enforce this on every build.
 
+
+### 7.5 Gemini Live configuration
+
+The Live model id is written once: `GEMINI_LIVE_MODEL` in `src/services/geminiBroker.ts`. Everything a Live session is configured with is assembled in `src/services/liveConfig.ts`, through VoiceCommon's `buildLiveConnectConfig` and `resolveThinkingConfig`. Those read VoiceCommon's Live model registry, which records what each model accepts (the current model rejects any `thinkingConfig`; another requires one), so no path sets a thinking level itself: all pass `'auto'`.
+
+Three code paths open a Live session, and all three go through `liveConfig.ts`:
+
+| Path | File | How it connects | Config |
+|---|---|---|---|
+| Conversation | `hooks/useCarbotSession.ts` | VoiceCommon `useSession` | `carbotLiveSessionOptions(profile)`: model, `'auto'` thinking, the nine app tools (VoiceCommon appends `endSession`), the opening cue, the profile's voice. Server VAD with VoiceCommon's defaults; no turn-taking option is set |
+| Voice audition | `services/voicePreview.ts` | direct `ai.live.connect` | `buildVoicePreviewConnectConfig(voiceName)`: same model and builder, the chosen voice, no tools |
+| Diagnostics probe | `services/liveProbe.ts` | raw WebSocket | `buildLiveSetupMessage()`: a minimal `setup` frame for the same model. Green only when the server answers `setupComplete`; a rejection shows the close code and reason |
+
+All three authenticate with a single-use ephemeral token from `mintGeminiLiveToken`. The token is not constrained to a model (`functions/src/liveTokenConfig.ts`), so the server holds no Live model id that could drift from the browser's.
+
+Tests (README, "Testing"): offline tests pin the exact config of each path, capture what the hook passes to `useSession`, and scan the source for a second copy of the model id, a retired id, a hand-set thinking level or an unlisted Live path. The live suite (`npm run test:live`) sends the same configs, with the real system instruction for a synthetic family, to the real API, and includes a content-safety smoke test for the SAFETY block.
+
+Function calls on the current model are asynchronous: the turn that issues a tool call completes at once, and the spoken answer to the tool result arrives as a further turn. The live suite's tool round trip expects this.
+
 ---
 
 ## 8. App Routes
@@ -459,6 +478,10 @@ VoiceCommon's `useSession` is wired up via the `tokenProvider` option of `initia
 src/
 ├── services/
 │   ├── tripContext.ts        # inferTripContext() and schedule helpers
+│   ├── geminiBroker.ts       # broker callables + GEMINI_LIVE_MODEL
+│   ├── liveConfig.ts         # Live config of every path (see 7.5)
+│   ├── liveProbe.ts          # diagnostics: token + Live session setup
+│   ├── voicePreview.ts       # Settings voice audition (second Live path)
 │   ├── instructionBuilder.ts # buildCarbotInstruction() - assembles system instruction
 │   ├── contextDocuments.ts   # CRUD for context_documents collection
 │   ├── memories.ts           # CRUD + retrieval for memories collection
@@ -492,6 +515,10 @@ src/
 │   ├── memories.test.ts
 │   ├── contextDocuments.test.ts
 │   ├── transcriptEditor.test.ts
+│   ├── liveConfig.test.ts, useCarbotSession.test.tsx, voicePreview.test.ts,
+│   │   liveProbe.test.ts, liveModelGuard.test.ts, liveToken.test.ts,
+│   │   liveSyntheticSession.test.ts   # Live configuration (offline)
+│   ├── live/                 # *.live.test.ts: real Gemini Live API, `npm run test:live` only
 │   └── setup.ts
 ├── types.ts
 ├── App.tsx
