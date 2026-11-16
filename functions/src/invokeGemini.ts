@@ -49,6 +49,28 @@ const ALLOWED_MODELS = new Set<string>([
   'gemini-embedding-001',
 ]);
 
+
+/**
+ * The only `config` keys a client may set. Everything else is dropped before
+ * the SDK sees it. Add a key only after checking it cannot change where the
+ * request goes, what credentials it carries, or what the server fetches.
+ * (`safetySettings` is not here on purpose: the server sets it below.)
+ */
+export const ALLOWED_CONFIG_KEYS = [
+  'thinkingConfig',
+  'temperature',
+  'topP',
+  'topK',
+  'seed',
+  'candidateCount',
+  'maxOutputTokens',
+  'stopSequences',
+  'responseMimeType',
+  'responseSchema',
+  'responseJsonSchema',
+  'systemInstruction',
+] as const;
+
 /** Cap output tokens to bound the worst-case cost of a single call. */
 const MAX_OUTPUT_TOKENS_CEILING = 32_768;
 
@@ -85,7 +107,24 @@ export function buildInvokeGeminiHandler(deps: {
       throw new HttpsError('invalid-argument', 'contents is required.');
     }
 
-    const safeConfig = { ...(config ?? {}) } as Record<string, unknown>;
+    // SECURITY: copy ONLY allow-listed generation settings. Never spread the
+    // client's config object. `config.httpOptions.baseUrl` is honoured per
+    // request by @google/genai, and the SDK still attaches
+    // `x-goog-api-key: <GEMINI_API_KEY>` to whatever host it names — so a
+    // caller who could set it would be handed the production key (found in
+    // LegacyBot's identical broker, 2026-11-15, reproduced with a dummy key).
+    // `tools` is excluded too: no client needs server-side tools.
+    const safeConfig: Record<string, unknown> = {};
+    if (config && typeof config === 'object' && !Array.isArray(config)) {
+      for (const key of ALLOWED_CONFIG_KEYS) {
+        if (Object.prototype.hasOwnProperty.call(config, key)) {
+          safeConfig[key] = (config as Record<string, unknown>)[key];
+        }
+      }
+    }
+    if (typeof safeConfig.candidateCount === 'number' && safeConfig.candidateCount > 1) {
+      safeConfig.candidateCount = 1;
+    }
     // Child-facing product: the strictest safety settings are enforced here
     // for every proxied call — a client cannot loosen them (#33).
     safeConfig.safetySettings = [...KID_SAFETY_SETTINGS];
