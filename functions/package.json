@@ -14,17 +14,17 @@
   "main": "lib/index.js",
   "dependencies": {
     "@google/genai": "^2.32.0",
-    "firebase-admin": "^14.5.0",
+    "firebase-admin": "^14.5.1",
     "firebase-functions": "^7.4.0",
     "googleapis": "^180.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^26.6.6",
-    "eslint": "^10.13.0",
+    "eslint": "^10.15.0",
     "globals": "^17.14.0",
     "typescript": "~5.8.2",
-    "typescript-eslint": "^8.72.2"
+    "typescript-eslint": "^8.73.0"
   },
   "private": true,
   "overrides": {
