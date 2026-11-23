@@ -52,8 +52,12 @@
   "overrides": {
     "minimatch": "^11.0.5",
     "@grpc/grpc-js": "^1.14.7",
+    "@andyfooblah/voice-common": {
+      "@google/genai": "$@google/genai"
+    },
     "@andyfooblah/knowledge-common": {
-      "firebase": "$firebase"
+      "firebase": "$firebase",
+      "@google/genai": "$@google/genai"
     }
   }
 }
