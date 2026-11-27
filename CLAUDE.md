@@ -73,6 +73,25 @@ For short-lived local development against an unpublished library build, use
 `npm link ../voicecommon` and unlink before committing; the lockfile must
 always reference the registry tarballs.
 
+## TypeScript 7 layout
+
+Both `package.json` files (root and `functions/`) install TypeScript side by
+side, the layout TypeScript documents for tools that still need its JS API:
+
+- `@typescript/native` (`npm:typescript@~7.0.2`) owns `tsc`, so type-checking
+  and the functions build run on TS 7.
+- `typescript` is `npm:@typescript/typescript6`, so `require('typescript')`
+  returns the TS 6 API that typescript-eslint needs (it refuses TS 7 until
+  typescript-eslint#10940 ships). `tsc6` runs TS 6.
+
+`npx tsc --version` must report 7.x. Do not point `typescript` at 7.x while
+typescript-eslint still refuses it, and do not install TS 7 as plain
+`typescript` next to `@typescript/typescript6`: that package depends on
+`@typescript/old` (TS 6), whose `tsc` bin npm links first, so `tsc` silently
+becomes TS 6. `functions/tsconfig.json` sets `"rootDir": "src"`; TS 6+ no longer
+infers it, and without it `tsc` fails with TS5011 and moves `lib/index.js`,
+which breaks the deploy even though CI (`tsc --noEmit`) stays green.
+
 ## Architecture notes
 
 ### VoiceCommon integration
